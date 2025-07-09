@@ -1,0 +1,10 @@
+{% extends '_base/_base.html' %}
+{% block content %}
+<h2 class="text-xl font-bold mb-4 text-red-600">Delete Product</h2>
+<p>Are you sure you want to delete: <strong>{{ product.name }}</strong>?</p>
+
+<form method="post">
+  {% csrf_token %}
+  <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded">Yes, Delete</button>
+</form>
+{% endblock %}

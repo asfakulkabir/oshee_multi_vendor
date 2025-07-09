@@ -1,0 +1,80 @@
+{% load custom_tags %}
+<section class="bg-gray-900 text-gray-300 py-5 md:py-8">
+    <div class="mx-auto px-4 sm:px-6 lg:px-8">
+        <h3 class="text-lg font-extrabold text-white mb-2 text-center md:text-left">Top Categories</h3>
+        <div class="flex flex-wrap justify-center md:justify-start gap-x-4 gap-y-3">
+            {% for category in footer_categories %}
+            <div class="whitespace-nowrap">
+                <a href="{% url 'website:category_detail' full_slug=category.get_full_slug %}"
+                   class="font-light text-gray-400 hover:text-white transition-colors duration-300 \">
+                    {{ category.name }}
+                </a>
+                {% if not forloop.last %}
+                    <span class="text-gray-600 text-lg ml-4">|</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<footer class="bg-gray-900 text-gray-300 py-12 md:py-16">
+    <div class=" mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-10 md:gap-x-12 lg:gap-x-16">
+
+
+            <div>
+                <h3 class="text-2xl font-bold text-white mb-4">Your Brand Name</h3>
+                <p class="text-sm leading-relaxed mb-6">
+                    Discover quality products for every need. We're committed to bringing you the best in fashion,
+                    electronics, home goods, and more.
+                </p>
+                <div class="flex space-x-5">
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors duration-300">
+                        <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path fill-rule="evenodd"
+                                d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33V22C18.343 21.128 22 16.991 22 12z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors duration-300">
+                        <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path fill-rule="evenodd"
+                                d="M12.274 2.628L12 0 11.726 2.628H.921l-.92 11.233L12 24l11.999-10.139-.92-11.233h-10.8zM12 4.417c-2.483 0-4.49 2.007-4.49 4.49 0 2.482 2.007 4.49 4.49 4.49s4.49-2.008 4.49-4.49c0-2.483-2.007-4.49-4.49-4.49zm0 8.01c-1.936 0-3.504-1.568-3.504-3.504S10.064 5.418 12 5.418s3.504 1.568 3.504 3.504S13.936 12.427 12 12.427z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors duration-300">
+                        <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path fill-rule="evenodd"
+                                d="M19.5 2.25A2.25 2.25 0 0017.25 0H6.75A2.25 2.25 0 004.5 2.25v19.5A2.25 2.25 0 006.75 24h10.5a2.25 2.25 0 002.25-2.25V2.25zm-6 6a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008a.75.75 0 01-.75-.75v-.008zm-2.25.75a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008a.75.75 0 01-.75-.75v-.008zM12 18.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75H12a.75.75 0 01-.75-.75v-.008a.75.75 0 01.75-.75zM12 15.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75H12a.75.75 0 01-.75-.75v-.008a.75.75 0 01.75-.75z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+
+            <div class="lg:pl-8">
+                <h3 class="text-xl font-bold text-white mb-5">Quick Links</h3>
+                <ul class="space-y-3">
+                    <li><a href="#" class="text-base hover:text-white transition-colors duration-300">About Us</a></li>
+                    <li><a href="#" class="text-base hover:text-white transition-colors duration-300">Contact Us</a>
+                    </li>
+                    <li><a href="#" class="text-base hover:text-white transition-colors duration-300">FAQ</a></li>
+                    <li><a href="#" class="text-base hover:text-white transition-colors duration-300">Privacy Policy</a>
+                    </li>
+                    <li><a href="#" class="text-base hover:text-white transition-colors duration-300">Terms of
+                            Service</a></li>
+                </ul>
+            </div>
+
+
+        </div>
+
+        {# Copyright and bottom line #}
+        <div class="border-t border-gray-700 mt-10 pt-8 text-center text-sm text-gray-500">
+            &copy; {% now "Y" %} OsheeBD. All rights reserved.
+        </div>
+    </div>
+</footer>

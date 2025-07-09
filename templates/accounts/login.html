@@ -1,0 +1,39 @@
+{% extends "_base/_base.html" %}
+{% load socialaccount %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center bg-gray-100 py-20 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-xl">
+    <div>
+      <h2 class="text-center text-3xl font-extrabold text-gray-900">Login to your account</h2>
+    </div>
+    <form method="post" class="mt-8 space-y-6">
+      {% csrf_token %}
+      {% for field in form %}
+        <div>
+          <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ field.label }}</label>
+          {{ field }}
+          {% if field.errors %}
+            <p class="text-sm text-red-600 mt-1">{{ field.errors|striptags }}</p>
+          {% endif %}
+        </div>
+      {% endfor %}
+      <div>
+        <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-xl shadow-sm text-white bg-blue-600 hover:bg-blue-700">
+          Login
+        </button>
+      </div>
+    </form>
+
+    <div class="mt-6 text-center">
+      <p class="text-gray-600">Or login with</p>
+      <a href="{% provider_login_url 'google' %}" class="inline-flex mt-2 items-center px-4 py-2 border border-gray-300 rounded-xl shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+        <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google" class="w-5 h-5 mr-2">
+        Sign in with Google
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,221 @@
+{% load compress %}
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Multi Vendor Site{% endblock %}</title>
+  {% block extra_head %}{% endblock %}
+
+  <script src="{% static 'js/tailwind.js' %}" ></script>    
+  <script src="{% static 'js/alpine.min.js' %}"></script>  
+  <script src="{% static 'js/main.js' %}"></script>  
+
+
+  <style type="text/tailwindcss">
+      @theme {
+        --color-clifford: #da373d;
+      }
+  </style>  
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+  {% compress css %}
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  {% endcompress %}
+
+</head>
+
+<body class="bg-[#fffff9]">
+
+{% include '_base/navbar.html' %}
+{% include '_base/_cart.html' %}
+
+<div id="notification" class="fixed bottom-4 left-4 z-50 hidden">
+    <div class="bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+        <span>Product added to cart!</span>
+    </div>
+</div>
+
+  {% block content %}
+  {% endblock content %}
+
+  <!-- Footer -->
+  {% include '_base/footer.html' %}
+
+  <!-- swipper -->
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+<!-- cart  -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+    const quantityElement = document.getElementById('quantity');
+    const decreaseQtyButton = document.getElementById('decrease-qty');
+    const increaseQtyButton = document.getElementById('increase-qty');
+    const addToCartButton = document.getElementById('add-to-cart');
+    const buyNowButton = document.getElementById('buy-now');
+    const productPriceElement = document.getElementById('product-price');
+    const variationContainer = document.getElementById('variation-container');
+    const notification = document.getElementById('notification');
+
+    let quantity = 1;
+    let selectedVariation = {};
+
+    const productName = '{{ product.name }}'
+    const product_imageurl ='{{ product.images.first.image.url }}';
+    const cart = JSON.parse(localStorage.getItem('cart')) || [];
+
+    function getCurrentDisplayedPrice() {
+        const priceSpans = productPriceElement.querySelectorAll('span');
+        let priceText = '';
+
+        if (priceSpans.length > 1) {
+            priceText = priceSpans[1].textContent;
+        } else if (priceSpans.length === 1) {
+            priceText = priceSpans[0].textContent;
+        } else {
+            priceText = productPriceElement.textContent;
+        }
+
+        return parseFloat(priceText.replace(/[^0-9.]/g, ''));
+    }
+
+    function updateQuantityFromCart() {
+        const existingProduct = cart.find(
+            (item) =>
+                item.name === productName &&
+                JSON.stringify(item.variation) === JSON.stringify(selectedVariation)
+        );
+
+        if (existingProduct) {
+            quantity = existingProduct.quantity;
+            quantityElement.textContent = quantity;
+        } else {
+            quantity = 1;
+            quantityElement.textContent = quantity;
+        }
+    }
+
+    updateQuantityFromCart();
+
+    decreaseQtyButton.addEventListener('click', () => {
+        if (quantity > 1) {
+            quantity--;
+            quantityElement.textContent = quantity;
+        }
+    });
+
+    increaseQtyButton.addEventListener('click', () => {
+        quantity++;
+        quantityElement.textContent = quantity;
+    });
+
+    if (variationContainer) {
+        variationContainer.addEventListener('click', (event) => {
+            const target = event.target;
+
+            if (target.dataset.color) {
+                selectedVariation.color = target.dataset.color;
+            }
+
+            if (target.dataset.size) {
+                selectedVariation.size = target.dataset.size;
+            }
+
+            if (target.dataset.weight) {
+                selectedVariation.weight = target.dataset.weight;
+            }
+
+            updateQuantityFromCart();
+        });
+    }
+
+    addToCartButton.addEventListener('click', () => {
+        const product = {
+            name: productName,
+            image : product_imageurl,
+            price: getCurrentDisplayedPrice(),
+            quantity: quantity,
+            variation: selectedVariation,
+        };
+
+        addToCart(product);
+        showNotification();
+    });
+
+    buyNowButton.addEventListener('click', () => {
+        const product = {
+            name: productName,
+            image : product_imageurl,
+            price: getCurrentDisplayedPrice(),
+            quantity: quantity,
+            variation: selectedVariation,
+        };
+
+        clearCart();
+        addToCart(product);
+        showNotification();
+        window.location.href = '/checkout_ecommerce';
+    });
+
+    function addToCart(product) {
+        let cart = JSON.parse(localStorage.getItem('cart')) || [];
+        const existingProductIndex = cart.findIndex(
+            (item) =>
+                item.name === product.name &&
+                JSON.stringify(item.variation) === JSON.stringify(product.variation)
+        );
+
+        if (existingProductIndex !== -1) {
+            cart[existingProductIndex].quantity = product.quantity;
+        } else {
+            cart.push(product);
+        }
+
+        localStorage.setItem('cart', JSON.stringify(cart));
+    }
+
+    function updateCart(productName, variation, newQuantity) {
+        let cart = JSON.parse(localStorage.getItem('cart')) || [];
+        const productIndex = cart.findIndex(
+            (item) =>
+                item.name === productName &&
+                JSON.stringify(item.variation) === JSON.stringify(variation)
+        );
+
+        if (productIndex !== -1) {
+            if (newQuantity > 0) {
+                cart[productIndex].quantity = newQuantity;
+            } else {
+                cart.splice(productIndex, 1);
+            }
+            localStorage.setItem('cart', JSON.stringify(cart));
+        }
+    }
+
+    function clearCart() {
+        localStorage.removeItem('cart');
+    }
+
+    function showNotification() {
+        notification.classList.remove('hidden');
+        notification.classList.remove('hide');
+        notification.classList.add('slideIn');
+
+        setTimeout(() => {
+            notification.classList.add('hide');
+            setTimeout(() => {
+                notification.classList.add('hidden');
+            }, 300);
+        }, 3000);
+    }
+});
+</script>
+</body>
+
+</html>

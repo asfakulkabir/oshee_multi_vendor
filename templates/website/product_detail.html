@@ -1,0 +1,514 @@
+{% extends "_base/_base.html" %}
+{% block title %}{{ product.name }}{% endblock %}
+
+{% block content %}
+<style>
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .selected-variation {
+    outline: 3px solid #10b981;
+    /* emerald border for selected */
+    outline-offset: 0.5px;
+  }
+
+  /* Basic styles for the lightbox */
+  #lightbox {
+    transition: opacity 0.3s ease-in-out;
+  }
+
+  #lightbox.hidden {
+    opacity: 0;
+    pointer-events: none;
+    /* Allows clicks to pass through when hidden */
+  }
+
+  #lightbox img {
+    max-width: 90%;
+    max-height: 90vh;
+    transform-origin: center center;
+    /* For zoom */
+  }
+</style>
+
+<section class="text-gray-600 body-font overflow-hidden">
+  <div class="px-5 pt-4 lg:pt-10 mx-auto w-full">
+    <div class="mx-auto flex flex-wrap">
+
+      <div class="w-full md:w-1/2 lg:w-1/4 px-4 md:mb-8 mb-3">
+        {% if product.images.first %}
+        <img src="{{ product.images.first.image.url }}" alt="{{ product.name }}"
+          class="w-full h-auto rounded-lg shadow mb-4 cursor-pointer" id="mainImage">
+        {% else %}
+        <img src="/static/icons/default-image.webp" alt="Default Product Image"
+          class="w-full h-auto rounded-lg shadow mb-4 cursor-pointer" id="mainImage">
+        {% endif %}
+        <div class="flex gap-4 overflow-x-auto">
+          {% for img in product.images.all %}
+          <img src="{{ img.image.url }}" class="size-16 object-cover cursor-pointer opacity-60 hover:opacity-100"
+            onclick="document.getElementById('mainImage').src='{{ img.image.url }}'" alt="Product thumbnail" />
+          {% endfor %}
+        </div>
+      </div>
+
+      <div id="lightbox" class="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 hidden">
+        <span class="absolute top-4 right-6 text-white text-5xl cursor-pointer" onclick="closeLightbox()">&times;</span>
+        <img src="" id="lightboxImage" class="max-w-[90%] max-h-[90vh] object-contain">
+      </div>
+
+      <div class="md:w-1/2 lg:w-[45%] w-full lg:pl-10 md:mt-4 mt-0">
+        <p class="mb-0 md:mb-2 text-sm">
+          {% for category in product.categories.all %}
+          <a href="{% url 'website:category_detail' full_slug=category.get_full_slug %}" class="text-rose-800">{{ category.name }}</a>
+          {% if not forloop.last %}, {% endif %}
+          {% empty %}No category{% endfor %}
+        </p>
+
+        <h1 class="text-xl text-slate-950 mb-0 md:mb-2">{{ product.name }}</h1>
+
+        <p class="text-lg text-zinc-950 font-semibold my-4">
+          <span id="product-price">
+            {# This will always show the base product's price #}
+            {% if product.sale_price %}
+            <span class="line-through text-zinc-500 font-light text-base">৳
+              {{ product.regular_price|floatformat:'0' }}</span>
+            &nbsp;<span class="text-zinc-700">৳ {{ product.sale_price|floatformat:'0' }}</span>
+            {% else %}
+            <span class="text-zinc-700">৳ {{ product.regular_price|floatformat:'0' }}</span>
+            {% endif %}
+          </span>
+
+          <span id="default-regular-price" class="hidden">{{ product.regular_price|floatformat:2 }}</span>
+          <span id="default-sale-price" class="hidden">{% if product.sale_price %}{{ product.sale_price|floatformat:2
+            }}{% else %}null{% endif %}</span>
+        </p>
+
+        <div class="bg-neutral-100 text-slate-900 rounded p-2 mb-4">
+          {{ product.short_description|safe }}
+        </div>
+
+        <div id="variation-container">
+          {% if variations %}
+          <div class="space-y-2">
+
+            <!-- Color Variations -->
+            <div>
+              <div class="flex flex-wrap gap-3">
+                {% for variation in variations %}
+                {% if variation.color %}
+                {% with variation.color|lower as color %}
+                <div class="w-9 h-9 rounded-full border-2 cursor-pointer transition-all duration-200 border-gray-300 hover:scale-105
+          {% if color == 'red' or color == 'blue' or color == 'green' or color == 'pink' or color == 'yellow' or color == 'purple' or color == 'orange' or color == 'lime' or color == 'teal' or color == 'emerald' or color == 'indigo' or color == 'rose' or color == 'gray' or color == 'slate' or color == 'zinc' or color == 'neutral' or color == 'stone' or color == 'amber' or color == 'sky' or color == 'cyan' or color == 'violet' or color == 'fuchsia' %}
+            bg-{{ color }}-500
+          {% elif color == 'black' or color == 'white' %}
+            bg-{{ color }}
+          {% else %}
+            bg-gray-300
+          {% endif %}" data-color="{{ color }}" data-price="{{ variation.price }}">
+                </div>
+                {% endwith %}
+                {% endif %}
+                {% endfor %}
+              </div>
+
+
+            </div>
+
+            <!-- Size Variations -->
+            <div>
+              <div class="flex flex-wrap gap-3">
+                {% for variation in variations %}
+                {% if variation.size %}
+                <button
+                  class="px-4 py-2 border rounded-md text-sm font-medium text-gray-700 bg-white shadow-sm hover:bg-gray-100 cursor-pointer transition-all duration-150"
+                  data-size="{{ variation.size }}" data-price="{{ variation.price }}">
+                  {{ variation.size }}
+                </button>
+                {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+
+            <!-- Weight Variations -->
+            <div>
+              <div class="flex flex-wrap gap-3">
+                {% for variation in variations %}
+                {% if variation.weight %}
+                <button
+                  class="px-4 py-2 border rounded-md text-sm font-medium text-gray-700 bg-white shadow-sm hover:bg-gray-100 cursor-pointer transition-all duration-150"
+                  data-weight="{{ variation.weight }}" data-price="{{ variation.price }}">
+                  {{ variation.weight }} kg
+                </button>
+                {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+
+          </div>
+
+          {% endif %}
+        </div>
+
+
+
+        <div class="mt-4 flex items-center space-x-4">
+          <button id="decrease-qty" class="px-3 py-1 bg-slate-700 text-white rounded">-</button>
+          <span id="quantity" class="text-lg font-medium">1</span>
+          <button id="increase-qty" class="px-3 py-1 bg-slate-700 text-white rounded">+</button>
+        </div>
+{% if product.stock_quantity %}
+        <div class="mt-4 flex gap-3">
+          <button id="add-to-cart" disabled
+            class="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white py-2 px-4 rounded disabled:opacity-50">
+            <!-- Shopping Bag Icon -->
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+              stroke="currentColor" class="w-5 h-5">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M16 11V7a4 4 0 10-8 0v4m-4 0h16l-1.38 9.66A2 2 0 0116.64 22H7.36a2 2 0 01-1.98-1.34L4 11z" />
+            </svg>
+            Add to Cart
+          </button>
+          <button id="buy-now" disabled class="bg-rose-700 hover:bg-rose-800 text-white py-2 px-4 rounded">Buy
+            Now</button>
+        </div>
+
+{% else %}
+        <div class="mt-4">
+          <p class="text-red-600 font-semibold">Out of Stock</p>
+        </div>
+        {% endif %}
+
+      </div>
+
+      <!-- 3rd Column -->
+      <div class="w-full hidden lg:flex lg:flex-col lg:w-[30%] p-6 space-y-4">
+        <!-- Estimated Delivery -->
+        <div class="flex items-start gap-4 text-gray-700">
+          <div>
+            <p class="font-semibold text-gray-900">Estimated Delivery</p>
+            <p class="text-sm">2–3 business days after order</p>
+          </div>
+        </div>
+
+        <!-- Need Help -->
+        <div class="flex items-start gap-4 text-gray-700">
+          <div>
+            <p class="font-semibold text-gray-900">Need Help?</p>
+            <p class="text-sm">
+              <a href="tel:+8801769021221" class="text-rose-800 hover:underline">Call us now</a>
+            </p>
+          </div>
+        </div>
+
+        <!-- Share Product -->
+        <div class="flex items-start gap-4 text-gray-700">
+          <div>
+            <p class="font-semibold text-gray-900">Share This Product</p>
+            <div class="flex items-center mt-2">
+              <button id="copyPageUrlButton"
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-rose-900 transition">
+                Copy Link
+              </button>
+              <span id="copyConfirmation" class="ml-3 text-sm text-green-600 hidden">Copied!</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Size Chart -->
+        <div class="flex items-start gap-4 text-gray-700">
+          <div>
+            <p class="font-semibold text-gray-900">Size Guide</p>
+            <p class="text-sm">
+              <button onclick="openSizeChartModal()" class="text-rose-800 hover:underline">View size chart</button>
+            </p>
+          </div>
+        </div>
+
+
+        <!-- Secure Checkout -->
+        <div class="flex items-start gap-4 text-gray-700">
+          <div>
+            <p class="font-semibold text-gray-900">Secure Checkout</p>
+            <p class="text-sm">Your payment information is processed securely with industry-grade encryption.</p>
+            <img src="/static/icons/pay_icons.webp" alt="Secure Checkout Oshee" class="mt-2 w-64 h-auto">
+          </div>
+        </div>
+
+
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="text-gray-600 body-font overflow-hidden">
+  <div class="container px-5 py-4 lg:py-10 mx-auto">
+    <h2 class="text-lg font-bold text-rose-800 mb-2">Product Information</h2>
+    <div class="bg-white p-4 rounded border border-gray-300">
+      <p class="leading-relaxed text-gray-900">{{ product.description|safe }}</p>
+    </div>
+  </div>
+</section>
+
+<!-- 3rd Column  mobile-->
+<div class="w-full lg:hidden flex flex-col lg:w-[30%] p-6 space-y-4">
+  <!-- Estimated Delivery -->
+  <div class="flex items-start gap-4 text-gray-700">
+    <div>
+      <p class="font-semibold text-gray-900">Estimated Delivery</p>
+      <p class="text-sm">2–3 business days after order</p>
+    </div>
+  </div>
+
+  <!-- Need Help -->
+  <div class="flex items-start gap-4 text-gray-700">
+    <div>
+      <p class="font-semibold text-gray-900">Need Help?</p>
+      <p class="text-sm">
+        <a href="tel:+8801769021221" class="text-rose-800 hover:underline">Call us now</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- Share Product -->
+  <div class="flex items-start gap-4 text-gray-700">
+    <div>
+      <p class="font-semibold text-gray-900">Share This Product</p>
+      <div class="flex items-center mt-2">
+        <button id="copyPageUrlButton"
+          class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-rose-900 transition">
+          Copy Link
+        </button>
+        <span id="copyConfirmation" class="ml-3 text-sm text-green-600 hidden">Copied!</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Size Chart -->
+  <div class="flex items-start gap-4 text-gray-700">
+    <div>
+      <p class="font-semibold text-gray-900">Size Guide</p>
+      <p class="text-sm">
+        <button onclick="openSizeChartModal()" class="text-rose-800 hover:underline">View size chart</button>
+      </p>
+    </div>
+  </div>
+
+
+  <!-- Secure Checkout -->
+  <div class="flex items-start gap-4 text-gray-700">
+    <div>
+      <p class="font-semibold text-gray-900">Secure Checkout</p>
+      <p class="text-sm">Your payment information is processed securely with industry-grade encryption.</p>
+      <img src="/static/icons/pay_icons.webp" alt="Secure Checkout Oshee" class="mt-2 w-64 h-auto">
+    </div>
+  </div>
+
+
+</div>
+
+<!-- Size Chart Modal -->
+<div id="sizeChartModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50">
+  <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full relative overflow-hidden">
+    <!-- Close button -->
+    <button onclick="closeSizeChartModal()" class="absolute top-3 right-3 text-gray-500 hover:text-black text-xl">
+      &times;
+    </button>
+
+    <!-- Modal Content -->
+    <div class="p-4">
+      <h2 class="text-lg font-semibold mb-4 text-center">Size Chart</h2>
+      <img src="/static/images/size_chart.jpg" alt="Size Chart" class="mx-auto max-h-[70vh] object-contain">
+    </div>
+  </div>
+</div>
+
+
+<!-- variation script  -->
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const priceElement = document.getElementById('product-price');
+    const defaultPriceHTML = priceElement.innerHTML.trim();
+
+    const addToCartBtn = document.getElementById('add-to-cart');
+    const buyNowBtn = document.getElementById('buy-now');
+
+    const variationButtons = document.querySelectorAll('[data-color], [data-size], [data-weight]');
+    const hasColor = document.querySelector('[data-color]') !== null;
+    const hasSize = document.querySelector('[data-size]') !== null;
+    const hasWeight = document.querySelector('[data-weight]') !== null;
+    const hasAnyVariation = variationButtons.length > 0;
+
+    let selectionSummary = null;
+
+    if (hasAnyVariation) {
+      selectionSummary = document.createElement('div');
+      selectionSummary.className = 'mt-3 text-sm text-rose-900';
+      selectionSummary.id = 'selection-summary';
+      priceElement.parentElement.appendChild(selectionSummary);
+    }
+
+    function updateSummary() {
+      if (!selectionSummary) return;
+
+      const selected = document.querySelectorAll('.selected-variation');
+      const texts = Array.from(selected).map(el => {
+        if (el.dataset.color) return el.dataset.color;
+        if (el.dataset.size) return el.dataset.size;
+        if (el.dataset.weight) return el.dataset.weight + 'kg';
+        return '';
+      });
+
+      selectionSummary.textContent = selected.length ? 'Selected: ' + texts.join(', ') : 'No variation selected';
+    }
+
+    function updatePrice() {
+      const weightElement = document.querySelector('[data-weight].selected-variation');
+      const rawPrice = weightElement ? weightElement.dataset.price : null;
+
+      if (rawPrice && !isNaN(parseFloat(rawPrice))) {
+        priceElement.innerHTML = `৳ ${parseFloat(rawPrice).toFixed(2)}`;
+      } else {
+        priceElement.innerHTML = defaultPriceHTML;
+      }
+    }
+
+    function updateButtonState() {
+      if (!hasAnyVariation) {
+        addToCartBtn.disabled = false;
+        buyNowBtn.disabled = false;
+        return;
+      }
+
+      const hasSelectedColor = !hasColor || document.querySelector('[data-color].selected-variation');
+      const hasSelectedSize = !hasSize || document.querySelector('[data-size].selected-variation');
+      const hasSelectedWeight = !hasWeight || document.querySelector('[data-weight].selected-variation');
+
+      const allSelected = hasSelectedColor && hasSelectedSize && hasSelectedWeight;
+
+      addToCartBtn.disabled = !allSelected;
+      buyNowBtn.disabled = !allSelected;
+    }
+
+    variationButtons.forEach(el => {
+      const attr = el.hasAttribute('data-color') ? 'data-color' :
+        el.hasAttribute('data-size') ? 'data-size' : 'data-weight';
+
+      el.addEventListener('click', function () {
+        const isAlreadySelected = el.classList.contains('selected-variation');
+
+        // Deselect all in same group
+        document.querySelectorAll(`[${attr}]`).forEach(e => e.classList.remove('selected-variation'));
+
+        // Toggle selection
+        if (!isAlreadySelected) {
+          el.classList.add('selected-variation');
+        }
+
+        updateSummary();
+        updatePrice();
+        updateButtonState();
+      });
+    });
+
+    // Run once on load
+    updateSummary();
+    updatePrice();
+    updateButtonState();
+  });
+</script>
+
+<!-- light box  -->
+<script>
+  const mainImage = document.getElementById('mainImage');
+  const lightbox = document.getElementById('lightbox');
+  const lightboxImage = document.getElementById('lightboxImage');
+
+  mainImage.addEventListener('click', () => {
+    lightbox.classList.remove('hidden');
+    lightboxImage.src = mainImage.src;
+    document.body.style.overflow = 'hidden'; // Prevent scrolling when lightbox is open
+  });
+
+  function closeLightbox() {
+    lightbox.classList.add('hidden');
+    document.body.style.overflow = ''; // Restore scrolling
+  }
+
+  // Close lightbox when clicking outside the image
+  lightbox.addEventListener('click', (e) => {
+    if (e.target === lightbox) {
+      closeLightbox();
+    }
+  });
+
+  // Optional: Add zoom functionality (simple example)
+  let scale = 1;
+  const zoomFactor = 0.1;
+
+  lightboxImage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      scale += zoomFactor; // Zoom in
+    } else {
+      scale -= zoomFactor; // Zoom out
+    }
+    scale = Math.max(0.5, Math.min(scale, 3)); // Limit zoom level
+    lightboxImage.style.transform = `scale(${scale})`;
+  });
+
+  // Optional: Reset zoom on lightbox close or when opening new image
+  lightbox.addEventListener('transitionend', () => {
+    if (lightbox.classList.contains('hidden')) {
+      scale = 1; // Reset zoom when lightbox closes
+      lightboxImage.style.transform = `scale(${scale})`;
+    }
+  });
+
+  mainImage.addEventListener('click', () => {
+    // ... existing code ...
+    scale = 1; // Reset zoom when new image is opened in lightbox
+    lightboxImage.style.transform = `scale(${scale})`;
+  });
+
+</script>
+
+
+<!-- Copy Script -->
+<script>
+  const copyPageUrlButton = document.getElementById('copyPageUrlButton');
+  const copyConfirmation = document.getElementById('copyConfirmation');
+
+  copyPageUrlButton.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      copyConfirmation.classList.remove('hidden');
+      setTimeout(() => {
+        copyConfirmation.classList.add('hidden');
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+      alert('Could not copy the link. Please copy it manually: ' + window.location.href);
+    }
+  });
+  function openSizeChartModal() {
+    document.getElementById('sizeChartModal').classList.remove('hidden');
+    document.getElementById('sizeChartModal').classList.add('flex');
+  }
+
+  function closeSizeChartModal() {
+    document.getElementById('sizeChartModal').classList.remove('flex');
+    document.getElementById('sizeChartModal').classList.add('hidden');
+  }
+
+  // Optional: Close modal on outside click
+  document.addEventListener('click', function (event) {
+    const modal = document.getElementById('sizeChartModal');
+    if (event.target === modal) {
+      closeSizeChartModal();
+    }
+  });
+</script>
+{% endblock %}

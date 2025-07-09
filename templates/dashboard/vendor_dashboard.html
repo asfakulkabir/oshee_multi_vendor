@@ -1,0 +1,96 @@
+{% extends '_base/_base.html' %}
+{% load static %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+  <h2 class="text-3xl font-bold mb-6">Welcome, {{ request.user.username }}</h2>
+
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-semibold">Your Products</h1>
+    <a href="{% url 'add_product' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow">
+      + Add Product
+    </a>
+  </div>
+
+  <!-- Search & Filter -->
+  <form method="get" class="flex flex-wrap gap-4 mb-6 items-center">
+    <input
+      type="text"
+      name="search"
+      value="{{ search_query }}"
+      placeholder="Search product name..."
+      class="border rounded px-3 py-2 flex-grow min-w-[250px]"
+    />
+    <select name="category" class="border rounded px-3 py-2">
+      <option value="">All Categories</option>
+      {% for cat in categories %}
+        <option value="{{ cat.id }}" {% if category_filter|add:'' == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow">Filter</button>
+    <a href="{% url 'vendor_dashboard' %}" class="ml-4 text-gray-600 hover:underline">Clear</a>
+  </form>
+
+  <!-- Products Table -->
+  <div class="overflow-x-auto bg-white border border-gray-200 shadow-sm rounded-lg">
+    <table class="min-w-full">
+      <thead class="bg-gray-100 text-gray-700">
+        <tr>
+          <th class="px-6 py-3 text-left text-sm font-medium border-b">Thumbnail</th>
+          <th class="px-6 py-3 text-left text-sm font-medium border-b">Product</th>
+          <th class="px-6 py-3 text-left text-sm font-medium border-b">Price</th>
+          <th class="px-6 py-3 text-left text-sm font-medium border-b">Stock</th>
+          <th class="px-6 py-3 text-left text-sm font-medium border-b">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for product in page_obj %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 border-b w-24">
+            {% if product.images.first %}
+              <img src="{{ product.images.first.image.url }}" alt="{{ product.name }}" class="w-16 h-16 object-cover rounded" />
+            {% else %}
+              <div class="w-16 h-16 bg-gray-200 rounded flex items-center justify-center text-gray-400">No Image</div>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 border-b">{{ product.name }}</td>
+          <td class="px-6 py-4 border-b text-gray-900 font-semibold">
+            {% if product.sale_price %}
+              <span class="line-through text-gray-500 mr-2">৳ {{ product.regular_price }}</span>
+              <span class="text-red-600">৳ {{ product.sale_price }}</span>
+            {% else %}
+              ৳ {{ product.regular_price }}
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 border-b">{{ product.stock_quantity }}</td>
+          <td class="px-6 py-4 border-b whitespace-nowrap">
+            <a href="{% url 'edit_product' product.id %}" class="text-blue-600 hover:underline mr-4">Edit</a>
+            <a href="{% url 'delete_product' product.id %}" class="text-red-600 hover:underline">Delete</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="text-center text-gray-500 py-6">You haven't added any products yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="mt-6 flex justify-center space-x-2 text-gray-700">
+    {% if page_obj.has_previous %}
+      <a href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if category_filter %}category={{ category_filter }}&{% endif %}page={{ page_obj.previous_page_number }}" class="px-3 py-1 border rounded hover:bg-gray-100">Previous</a>
+    {% else %}
+      <span class="px-3 py-1 border rounded text-gray-400 cursor-not-allowed">Previous</span>
+    {% endif %}
+
+    <span class="px-3 py-1 border rounded bg-gray-200 font-semibold">{{ page_obj.number }}</span>
+
+    {% if page_obj.has_next %}
+      <a href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if category_filter %}category={{ category_filter }}&{% endif %}page={{ page_obj.next_page_number }}" class="px-3 py-1 border rounded hover:bg-gray-100">Next</a>
+    {% else %}
+      <span class="px-3 py-1 border rounded text-gray-400 cursor-not-allowed">Next</span>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,199 @@
+{% extends '_base/_base.html' %}
+{% load static %}
+{% block title %}My Wishlist{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4 md:py-8">
+    <h1 class="text-3xl font-bold mb-6 text-gray-800 pb-3">My Wishlist</h1>
+
+    <div id="wishlistLoading" class="hidden text-center py-10">
+        <svg class="animate-spin h-8 w-8 text-rose-800 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p class="text-gray-600 mt-2">Loading wishlist...</p>
+    </div>
+
+    <div id="wishlistProductsGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        </div>
+
+    <div id="emptyWishlistMessage" class="hidden col-span-full text-center py-12">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <h3 class="mt-2 text-lg font-medium text-gray-900">Your wishlist is empty</h3>
+        <p class="mt-1 text-gray-500">Looks like you haven't added any products yet.</p>
+        <div class="mt-6">
+            <a href="{% url 'website:shop' %}" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-rose-900 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-800">
+                Start shopping
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .wishlist-icon {
+        fill: none;
+    }
+    .wishlist-icon.filled {
+        fill: currentColor;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const wishlistProductsGrid = document.getElementById('wishlistProductsGrid');
+    const emptyWishlistMessage = document.getElementById('emptyWishlistMessage');
+    const wishlistLoading = document.getElementById('wishlistLoading');
+
+    function getWishlist() {
+        const wishlist = localStorage.getItem('wishlist');
+        return wishlist ? JSON.parse(wishlist) : [];
+    }
+
+    function saveWishlist(wishlist) {
+        localStorage.setItem('wishlist', JSON.stringify(wishlist));
+        document.cookie = `wishlist_ids=${JSON.stringify(wishlist)}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+    }
+
+    function updateWishlistIcon(productId, isAdded) {
+        document.querySelectorAll(`.wishlist-toggle[data-product-id="${productId}"]`).forEach(button => {
+            const icon = button.querySelector('.wishlist-icon');
+            if (icon) {
+                if (isAdded) {
+                    icon.classList.add('filled');
+                    icon.setAttribute('fill', 'currentColor');
+                } else {
+                    icon.classList.remove('filled');
+                    icon.setAttribute('fill', 'none');
+                }
+            }
+        });
+    }
+
+    function handleWishlistToggle(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const button = event.currentTarget;
+        const productId = button.dataset.productId;
+        let wishlist = getWishlist();
+        const index = wishlist.indexOf(productId);
+
+        if (index > -1) {
+            wishlist.splice(index, 1);
+            updateWishlistIcon(productId, false);
+            saveWishlist(wishlist);
+            button.closest('.bg-white.rounded-lg').remove();
+            if (getWishlist().length === 0) {
+                emptyWishlistMessage.classList.remove('hidden');
+            }
+        }
+    }
+
+    function renderWishlistProducts(products) {
+        wishlistProductsGrid.innerHTML = '';
+        if (products.length === 0) {
+            emptyWishlistMessage.classList.remove('hidden');
+        } else {
+            emptyWishlistMessage.classList.add('hidden');
+            products.forEach(product => {
+                const productCard = `
+                    <div class="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 relative">
+                        <a href="/product/${product.slug}/" class="block">
+                            <img src="${product.image}" alt="${product.name}"
+                                class="aspect-square w-full bg-gray-200 object-cover object-top" />
+                        </a>
+                        <button class="absolute bottom-2 right-2 p-1 rounded-full bg-white bg-opacity-75 hover:bg-opacity-100 text-gray-400 hover:text-red-500 transition-colors duration-200 wishlist-toggle" data-product-id="${product.id}">
+                              <svg class="w-6 h-6 wishlist-icon filled" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"  stroke="currentColor" fill="currentColor">
+    <path d="M12.001 4.529c2.349-2.532 6.15-2.532 8.498 0 2.172 2.343 2.216 6.122.102 8.507l-7.507 7.934a1.125 1.125 0 01-1.628 0l-7.507-7.934C1.284 10.65 1.328 6.872 3.5 4.529c2.348-2.532 6.149-2.532 8.501 0z"/>
+  </svg>
+                        </button>
+                        
+                        <div class="p-4">
+                            <h3 class="font-medium text-gray-900 mb-1 truncate text-sm lg:text-base">
+                                <a href="/products/${product.slug}/">${product.name}</a>
+                            </h3>
+                            <div class="flex justify-between items-center">
+                                <div class="price text-sm lg:text-base">
+                                    ${product.sale_price !== null && product.sale_price !== undefined ?
+                                        `<span class="text-rose-800 font-semibold">৳${product.sale_price.toFixed(0)}</span>
+                                         <span class="text-gray-500 text-sm line-through ml-1">৳${product.regular_price.toFixed(0)}</span>`
+                                        : `<span class="font-semibold">৳${product.regular_price.toFixed(0)}</span>`
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                wishlistProductsGrid.insertAdjacentHTML('beforeend', productCard);
+            });
+            attachWishlistToggleListeners();
+        }
+    }
+
+    function attachWishlistToggleListeners() {
+        document.querySelectorAll('#wishlistProductsGrid .wishlist-toggle').forEach(button => {
+            button.removeEventListener('click', handleWishlistToggle);
+            button.addEventListener('click', handleWishlistToggle);
+        });
+    }
+
+    async function fetchAndDisplayWishlistProducts() {
+        const wishlistIds = getWishlist();
+        wishlistLoading.classList.remove('hidden');
+        wishlistProductsGrid.innerHTML = '';
+        emptyWishlistMessage.classList.add('hidden');
+
+        if (wishlistIds.length === 0) {
+            wishlistLoading.classList.add('hidden');
+            emptyWishlistMessage.classList.remove('hidden');
+            return;
+        }
+
+        try {
+            const response = await fetch('{% url "website:wishlist_products_api" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ product_ids: wishlistIds })
+            });
+
+            if (!response.ok) {
+                let errorData = await response.json().catch(() => ({}));
+                throw new Error(`HTTP error! status: ${response.status}. ${errorData.error || response.statusText}`);
+            }
+
+            const products = await response.json();
+            renderWishlistProducts(products);
+
+        } catch (error) {
+            console.error('Error fetching wishlist products:', error);
+            wishlistProductsGrid.innerHTML = `<p class="col-span-full text-center text-red-600 py-10">Error loading wishlist: ${error.message}. Please try again.</p>`;
+            emptyWishlistMessage.classList.add('hidden');
+        } finally {
+            wishlistLoading.classList.add('hidden');
+        }
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    fetchAndDisplayWishlistProducts();
+});
+</script>
+{% endblock %}

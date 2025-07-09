@@ -1,0 +1,154 @@
+{% extends '_base/_base.html' %}
+{% load static %}
+{% block content %}
+<h2 class="text-2xl font-bold mb-6">Edit Product: {{ product.name }}</h2>
+
+<form method="post" enctype="multipart/form-data" x-data="productForm()" @submit.prevent="submitForm" class="space-y-6">
+  {% csrf_token %}
+
+  <!-- Basic Fields -->
+  <div>
+    <label class="block font-medium mb-1">Product Name</label>
+    <input type="text" name="name" x-model="product.name" required class="border rounded px-3 py-2 w-full" />
+  </div>
+
+  <div>
+    <label class="block font-medium mb-1">Description</label>
+    <textarea name="description" x-model="product.description" class="border rounded px-3 py-2 w-full"></textarea>
+  </div>
+
+  <div>
+    <label class="block font-medium mb-1">Categories</label>
+    <template x-for="category in categories" :key="category.id">
+      <label class="inline-flex items-center mr-4">
+        <input type="checkbox" name="categories" :value="category.id" x-model="product.categories" class="form-checkbox" />
+        <span class="ml-2" x-text="category.name"></span>
+      </label>
+    </template>
+  </div>
+
+  <!-- Prices and Stock -->
+  <div class="grid grid-cols-2 gap-4">
+    <div>
+      <label class="block font-medium mb-1">Regular Price</label>
+      <input type="number" name="regular_price" step="0.01" min="0" x-model="product.regular_price" required class="border rounded px-3 py-2 w-full" />
+    </div>
+    <div>
+      <label class="block font-medium mb-1">Sale Price</label>
+      <input type="number" name="sale_price" step="0.01" min="0" x-model="product.sale_price" class="border rounded px-3 py-2 w-full" />
+    </div>
+  </div>
+
+  <div>
+    <label class="block font-medium mb-1">Stock Quantity</label>
+    <input type="number" name="stock_quantity" min="0" x-model="product.stock_quantity" required class="border rounded px-3 py-2 w-full" />
+  </div>
+
+  <!-- Images -->
+  <div>
+    <h3 class="font-semibold mb-2">Product Images</h3>
+    <template x-for="(img, index) in images" :key="index">
+      <div class="flex items-center space-x-4 mb-3">
+        <div class="w-24 h-24 bg-gray-200 border rounded overflow-hidden">
+          <img :src="img.url || img.preview" class="w-full h-full object-cover" />
+        </div>
+        <input type="file" :name="'images-' + index" @change="previewImage($event, index)" />
+        <button type="button" @click="removeImage(index)" class="text-red-600 hover:underline">Remove</button>
+      </div>
+    </template>
+    <button type="button" @click="addImage()" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">+ Add Image</button>
+  </div>
+
+  <!-- Hidden fields for deleted image IDs -->
+  <template x-for="id in deletedImageIds" :key="'deleted-' + id">
+    <input type="hidden" name="deleted_images" :value="id">
+  </template>
+
+  <!-- Variations -->
+  <div>
+    <h3 class="font-semibold mb-2">Product Variations</h3>
+    <template x-for="(variation, idx) in variations" :key="idx">
+      <div class="border p-4 mb-4 rounded">
+        <select multiple :name="'variations-' + idx + '-attribute_values'" x-model="variation.attribute_values" class="border rounded px-2 py-1 w-full mb-2">
+          <template x-for="attrValue in attributeValues" :key="attrValue.id">
+            <option :value="attrValue.id" x-text="attrValue.display"></option>
+          </template>
+        </select>
+        <input type="number" :name="'variations-' + idx + '-price'" x-model="variation.price" placeholder="Price" class="border rounded px-2 py-1 w-full mb-2" required />
+        <input type="number" :name="'variations-' + idx + '-stock_quantity'" x-model="variation.stock_quantity" placeholder="Stock Qty" class="border rounded px-2 py-1 w-full mb-2" required />
+        <input type="hidden" :name="'variations-' + idx + '-id'" :value="variation.id">
+        <button type="button" @click="removeVariation(idx)" class="text-red-600 hover:underline">Remove</button>
+      </div>
+    </template>
+    <button type="button" @click="addVariation()" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">+ Add Variation</button>
+  </div>
+
+  <!-- Submit -->
+  <div>
+    <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Update Product</button>
+  </div>
+</form>
+
+<script>
+  function productForm() {
+    return {
+      product: {
+        name: '{{ product.name|escapejs }}',
+        description: '{{ product.description|escapejs }}',
+        categories: {{ categories|safe }},
+        regular_price: '{{ product.regular_price }}',
+        sale_price: '{{ product.sale_price }}',
+        stock_quantity: '{{ product.stock_quantity }}',
+      },
+      categories: {{ categories_list|safe }},
+      attributeValues: {{ attribute_values|safe }},
+      images: [
+        {% for image in product.images.all %}
+          { id: {{ image.id }}, url: '{{ image.image.url }}', file: null, preview: '' },
+        {% endfor %}
+      ],
+      deletedImageIds: [],
+      variations: [
+        {% for variation in product.variations.all %}
+          {
+            id: {{ variation.id }},
+            attribute_values: [{% for av in variation.attribute_values.all %}{{ av.id }},{% endfor %}],
+            price: '{{ variation.price }}',
+            stock_quantity: '{{ variation.stock_quantity }}',
+          },
+        {% endfor %}
+      ],
+
+      addImage() {
+        this.images.push({ file: null, preview: '', url: '' });
+      },
+      removeImage(index) {
+        const image = this.images[index];
+        if (image.id) {
+          this.deletedImageIds.push(image.id);
+        }
+        this.images.splice(index, 1);
+      },
+      previewImage(event, index) {
+        const file = event.target.files[0];
+        if (!file) return;
+        this.images[index].file = file;
+        const reader = new FileReader();
+        reader.onload = e => {
+          this.images[index].preview = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      },
+      addVariation() {
+        this.variations.push({ id: null, attribute_values: [], price: '', stock_quantity: '' });
+      },
+      removeVariation(index) {
+        this.variations.splice(index, 1);
+      },
+      submitForm() {
+        this.$root.submit();
+      }
+    };
+  }
+</script>
+{% endblock %}
