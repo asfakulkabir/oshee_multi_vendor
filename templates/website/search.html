@@ -1,0 +1,845 @@
+{% extends '_base/_base.html' %}
+{% load shop_tags %}
+{% block title %} Searrch Products - OsheeBd {% endblock %}
+
+{% block content %}
+
+<div id="mobileSortOptions" class="fixed inset-x-0 bottom-0 z-50 bg-white shadow-lg transform translate-y-full transition-transform duration-300 ease-out md:hidden">
+    <div class="p-4">
+        <h3 class="text-lg font-semibold mb-4 text-center">Sort Options</h3>
+        <div class="space-y-3">
+            {% for key, value in sort_options.items %}
+            <button type="button"
+                    class="block w-full text-left py-3 px-4 rounded-lg
+                           {% if current_sort == key %}bg-rose-800 text-white{% else %}bg-gray-100 text-gray-800 hover:bg-gray-200{% endif %}
+                           focus:outline-none focus:ring-2 focus:ring-rose-800 focus:ring-offset-2"
+                    data-sort-key="{{ key }}">
+                {{ value }}
+            </button>
+            {% endfor %}
+        </div>
+        <button type="button" id="closeMobileSortOptions" class="mt-6 w-full py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2">
+            Close
+        </button>
+    </div>
+</div>
+
+<div id="mobileFilterOptions" class="fixed inset-x-0 bottom-0 z-50 bg-white shadow-lg transform translate-y-full transition-transform duration-300 ease-out md:hidden h-4/5 overflow-y-auto">
+    <div class="p-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Filters</h3>
+            <button type="button" id="closeMobileFilterOptions" class="text-gray-500 hover:text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="space-y-6 pb-20">
+            <div class="filter-section">
+                <h6 class="text-sm font-medium uppercase text-gray-500 px-2 mb-2">Categories</h6>
+                <ul class="space-y-1" id="categoryList">
+                    <li>
+                        <a href="?{% modify_query category=None %}"
+                           class="block px-2 py-1 rounded {% if not current_category %}bg-blue-50 text-rose-900{% else %}hover:bg-gray-100{% endif %}">
+                            All Categories
+                        </a>
+                    </li>
+                    {% for category in categories %}
+                    <li {% if forloop.counter0 >= 5 %}class="hidden-category"{% endif %}>
+                        <div class="flex justify-between items-center text-center">
+                            <a href="?{% modify_query category=category.slug %}"
+                           class="block px-2 py-1 rounded {% if current_category == category.slug %}bg-blue-50 text-rose-900{% else %}hover:bg-gray-100{% endif %}">
+                            {{ category.name }}
+                        </a>
+                        {% if category.children.all %}
+                          <button onclick="toggleSubcategories('subcat-{{ category.id }}', this)"
+                                  class="text-gray-500 hover:text-gray-900 px-2">
+                            <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" stroke-width="2"
+                                 viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6" />
+                            </svg>
+                          </button>
+                          {% endif %}
+                        </div>
+
+                        {% if category.children.all %}
+                        <ul class="pl-4 mt-1 space-y-1 hidden" id="subcat-{{ category.id }}">
+                            {% for child in category.children.all %}
+                            <li>
+                                <a href="?{% modify_query category=child.slug %}"
+                                   class="block px-2 py-1 rounded {% if current_category == child.slug %}bg-blue-50 text-rose-900{% else %}hover:bg-gray-100{% endif %}">
+                                    {{ child.name }}
+                                </a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% if categories|length > 5 %}
+                <button id="viewAllCategoriesBtn" class="mt-2 w-full py-2 px-3 text-rose-800 cursor-pointer underline text-sm text-start">
+                    View All Categories
+                </button>
+                {% endif %}
+            </div>
+
+            <div class="filter-section">
+                <h6 class="text-sm font-medium uppercase text-gray-500 px-2 mb-2">Price Range</h6>
+                <div class="px-2">
+                    <div class="flex justify-between mb-2">
+                        <span id="mobileMinPriceValue">৳{{ selected_min|floatformat:0 }}</span>
+                        <span id="mobileMaxPriceValue">৳{{ selected_max|floatformat:0 }}</span>
+                    </div>
+                    <div class="relative h-2 bg-gray-200 rounded-lg mb-4">
+                        <input type="range" min="{{ min_price|floatformat:0 }}" max="{{ max_price|floatformat:0 }}"
+                               value="{{ selected_min|floatformat:0 }}"
+                               class="absolute w-full h-2 bg-transparent appearance-none cursor-pointer price-slider"
+                               id="mobileMinPrice">
+                        <input type="range" min="{{ min_price|floatformat:0 }}" max="{{ max_price|floatformat:0 }}"
+                               value="{{ selected_max|floatformat:0 }}"
+                               class="absolute w-full h-2 bg-transparent appearance-none cursor-pointer price-slider"
+                               id="mobileMaxPrice">
+                        <div id="mobileRangeTrack" class="absolute h-full bg-rose-900 rounded-lg"></div>
+                    </div>
+
+                    <button class="mt-2 w-full py-1 px-3 bg-rose-900 text-white rounded-md text-sm"
+                            id="applyMobilePriceFilter">
+                        Apply Price
+                    </button>
+                </div>
+            </div>
+
+            {% if available_filters.colors %}
+            <div class="filter-section">
+                <h6 class="text-sm font-medium uppercase text-gray-500 px-2 mb-2">Colors</h6>
+                <div class="px-2 space-y-1">
+                    {% for color in available_filters.colors %}
+                    <div class="flex items-center">
+                        <input type="checkbox" id="mobile-color-{{ forloop.counter }}"
+                               name="mobile_color" value="{{ color }}"
+                               class="h-4 w-4 text-rose-900 rounded border-gray-300 focus:ring-rose-800"
+                               {% if color in selected_colors %}checked{% endif %}>
+                        <label for="mobile-color-{{ forloop.counter }}" class="ml-2 text-sm text-gray-700 capitalize">
+                            {{ color }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if available_filters.sizes %}
+            <div class="filter-section">
+                <h6 class="text-sm font-medium uppercase text-gray-500 px-2 mb-2">Sizes</h6>
+                <div class="px-2 space-y-1">
+                    {% for size in available_filters.sizes %}
+                    <div class="flex items-center">
+                        <input type="checkbox" id="mobile-size-{{ forloop.counter }}"
+                               name="mobile_size" value="{{ size }}"
+                               class="h-4 w-4 text-rose-900 rounded border-gray-300 focus:ring-rose-800"
+                               {% if size in selected_sizes %}checked{% endif %}>
+                        <label for="mobile-size-{{ forloop.counter }}" class="ml-2 text-sm text-gray-700">
+                            {{ size }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if available_filters.weights %}
+            <div class="filter-section">
+                <h6 class="text-sm font-medium uppercase text-gray-500 px-2 mb-2">Weights</h6>
+                <div class="px-2 space-y-1">
+                    {% for weight in available_filters.weights %}
+                    <div class="flex items-center">
+                        <input type="checkbox" id="mobile-weight-{{ forloop.counter }}"
+                               name="mobile_weight" value="{{ weight }}"
+                               class="h-4 w-4 text-rose-900 rounded border-gray-300 focus:ring-rose-800"
+                               {% if weight in selected_weights %}checked{% endif %}>
+                        <label for="mobile-weight-{{ forloop.counter }}" class="ml-2 text-sm text-gray-700">
+                            {{ weight }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div id="backdrop" class="fixed inset-0 bg-black/50 z-40 hidden transition-opacity duration-300 ease-out opacity-0"></div>
+
+<div class="fixed md:hidden bottom-0 left-0 z-40 w-full h-16 bg-white border-t border-gray-200">
+  <div class="grid h-full max-w-lg grid-cols-2 mx-auto font-medium">
+    <button type="button" class="inline-flex items-center justify-center px-5 hover:bg-gray-50 group text-center space-x-2" id="mobileFilterToggle">
+      <svg class="w-6 h-6 text-gray-800" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M10.83 5a3.001 3.001 0 0 0-5.66 0H4a1 1 0 1 0 0 2h1.17a3.001 3.001 0 0 0 5.66 0H20a1 1 0 1 0 0-2h-9.17ZM4 11h9.17a3.001 3.001 0 0 1 5.66 0H20a1 1 0 1 1 0 2h-1.17a3.001 3.001 0 0 1-5.66 0H4a1 1 0 1 1 0-2Zm1.17 6H4a1 1 0 1 0 0 2h1.17a3.001 3.001 0 0 0 5.66 0H20a1 1 0 1 0 0-2h-9.17a3.001 3.001 0 0 0-5.66 0Z"/>
+      </svg>
+      <span class="text-sm text-gray-500 group-hover:text-blue-600">FILTERS</span>
+    </button>
+    <button type="button" class="inline-flex items-center justify-center px-5 hover:bg-gray-50 group text-center space-x-2" id="mobileSortToggle">
+      <svg class="w-6 h-6 text-gray-800" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 20V7m0 13-4-4m4 4 4-4m4-12v13m0-13 4 4m-4-4-4 4"/>
+      </svg>
+      <span class="text-sm text-gray-500 group-hover:text-blue-600">SORT</span>
+    </button>
+  </div>
+</div>
+
+<div class="mx-auto p-4">
+    <div class="flex flex-col md:flex-row md:gap-6">
+        <aside class="w-full md:w-64 flex-shrink-0">
+            <div class="sticky top-4 space-y-6">
+                <h5 class="text-lg font-semibold px-2 hidden md:block">Filters</h5>
+                <div id="filterSections" class="hidden md:block space-y-6">
+                    <div class="filter-section">
+                        <h6 class="text-sm font-medium uppercase text-gray-500 px-2 mb-2">Categories</h6>
+                        <ul class="space-y-1" id="desktopCategoryList">
+                            <li>
+                                <a href="?{% modify_query category=None %}"
+                                   class="block px-2 py-1 rounded {% if not current_category %}bg-blue-50 text-rose-900{% else %}hover:bg-gray-100{% endif %}">
+                                    All Categories
+                                </a>
+                            </li>
+                            {% for category in categories %}
+                            <li {% if forloop.counter0 >= 5 %}class="hidden-category"{% endif %}>
+                               <div class="flex items-end justify-between text-center">
+                                 <a href="?{% modify_query category=category.slug %}"
+                                   class="block px-2 py-1 rounded {% if current_category == category.slug %}bg-blue-50 text-rose-900{% else %}hover:bg-gray-100{% endif %}">
+                                    {{ category.name }}
+                                </a>
+                                {% if category.children.all %}
+                                 <button onclick="toggleSubcategories('second-subcat-{{ category.id }}', this)"
+                                         class="text-gray-500 hover:text-gray-900 px-2">
+                                   <svg class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" stroke-width="2"
+                                        viewBox="0 0 24 24">
+                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6" />
+                                   </svg>
+                                 </button>
+                                 {% endif %}
+                               </div>
+
+                                {% if category.children.all %}
+                                <ul id="second-subcat-{{ category.id }}" class="pl-4 mt-1 space-y-1 hidden">
+                                    {% for child in category.children.all %}
+                                    <li>
+                                        <a href="?{% modify_query category=child.slug %}"
+                                           class="block px-2 py-1 rounded {% if current_category == child.slug %}bg-blue-50 text-rose-900{% else %}hover:bg-gray-100{% endif %}">
+                                            {{ child.name }}
+                                        </a>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% if categories|length > 5 %}
+
+                                                <button id="viewAllDesktopCategoriesBtn" class="mt-2 w-full py-2 px-3 text-rose-800 cursor-pointer underline text-sm text-start">
+                            View All Categories
+                        </button>
+                        {% endif %}
+                    </div>
+
+                    <div class="filter-section">
+                        <h6 class="text-sm font-medium uppercase text-gray-500 px-2 mb-2">Price Range</h6>
+                        <div class="px-2">
+                            <div class="flex justify-between mb-2">
+                                <span id="minPriceValue">৳{{ selected_min|floatformat:0 }}</span>
+                                <span id="maxPriceValue">৳{{ selected_max|floatformat:0 }}</span>
+                            </div>
+                            <div class="relative h-2 bg-gray-200 rounded-lg mb-4">
+                                <input type="range" min="{{ min_price|floatformat:0 }}" max="{{ max_price|floatformat:0 }}"
+                                       value="{{ selected_min|floatformat:0 }}"
+                                       class="absolute w-full h-2 bg-transparent appearance-none cursor-pointer price-slider"
+                                       id="minPrice">
+                                <input type="range" min="{{ min_price|floatformat:0 }}" max="{{ max_price|floatformat:0 }}"
+                                       value="{{ selected_max|floatformat:0 }}"
+                                       class="absolute w-full h-2 bg-transparent appearance-none cursor-pointer price-slider"
+                                       id="maxPrice">
+                                <div id="rangeTrack" class="absolute h-full bg-rose-900 rounded-lg"></div>
+                            </div>
+
+                            <button class="mt-2 w-full py-1 px-3 bg-rose-900 text-white rounded-md text-sm"
+                                    id="applyPriceFilter">
+                                Apply Price
+                            </button>
+                        </div>
+                    </div>
+
+                    {% if available_filters.colors %}
+                    <div class="filter-section">
+                        <h6 class="text-sm font-medium uppercase text-gray-500 px-2 mb-2">Colors</h6>
+                        <div class="px-2 space-y-1">
+                            {% for color in available_filters.colors %}
+                            <div class="flex items-center">
+                                <input type="checkbox" id="color-{{ forloop.counter }}"
+                                       name="color" value="{{ color }}"
+                                       class="h-4 w-4 text-rose-900 rounded border-gray-300 focus:ring-rose-800"
+                                       {% if color in selected_colors %}checked{% endif %}>
+                                <label for="color-{{ forloop.counter }}" class="ml-2 text-sm text-gray-700 capitalize">
+                                    {{ color }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if available_filters.weights %}
+                    <div class="filter-section">
+                        <h6 class="text-sm font-medium uppercase text-gray-500 px-2 mb-2">Weights</h6>
+                        <div class="px-2 space-y-1">
+                            {% for weight in available_filters.weights %}
+                            <div class="flex items-center">
+                                <input type="checkbox" id="weight-{{ forloop.counter }}"
+                                       name="weight" value="{{ weight }}"
+                                       class="h-4 w-4 text-rose-900 rounded border-gray-300 focus:ring-rose-800"
+                                       {% if weight in selected_weights %}checked{% endif %}>
+                                <label for="weight-{{ forloop.counter }}" class="ml-2 text-sm text-gray-700">
+                                    {{ weight }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                <h1 class="text-2xl font-bold">Shop</h1>
+
+                <div class="hidden md:flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <form class="w-full sm:w-64" method="get">
+                        <div class="relative">
+                            <input type="text" name="search" placeholder="Search products..."
+                                   value="{{ search_query }}"
+                                   class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-rose-800 focus:border-rose-800">
+                            <button type="submit" class="absolute right-2 top-2 text-gray-400 hover:text-gray-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="relative w-full sm:w-48">
+                        <select id="sortDropdown"
+                                class="w-full pl-3 pr-10 py-2 border rounded-lg focus:ring-rose-800 focus:border-rose-800 appearance-none bg-white">
+                            {% for key, value in sort_options.items %}
+                            <option value="{{ key }}" {% if current_sort == key %}selected{% endif %}>
+                                Sort: {{ value }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="skeletonLoading" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-4 lg:gap-5 xl:gap-6">
+                {% for i in "12345678" %}
+                <div class="bg-white rounded-lg overflow-hidden shadow-sm animate-pulse">
+                    <div class="bg-gray-200 h-48 w-full"></div>
+                    <div class="p-4 space-y-3">
+                        <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+                        <div class="h-4 bg-gray-200 rounded w-1/4"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div id="productGrid" class="hidden grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-4 lg:gap-5 xl:gap-6">
+                {% if products %}
+                    {% for product in products %}
+                    <div class="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 relative">
+                        <a href="{% url 'website:product_detail' product.slug %}" class="block">
+                            {% if product.images.first %}
+                            <img src="{{ product.images.first.image.url }}" alt="{{ product.name }}"
+                                class="aspect-square w-full bg-gray-200 object-cover object-top group-hover:opacity-75 lg:aspect-auto lg:h-80" />
+                            {% else %}
+                            <img src="/static/icons/default-image.webp" alt="{{ product.name }}"
+                                class="aspect-square w-full bg-gray-200 object-cover object-center group-hover:opacity-75 lg:aspect-auto lg:h-80" />
+                            {% endif %}
+                        </a>
+                        <button class="absolute bottom-2 right-2 p-2 rounded-full text-gray-400 hover:text-red-500 transition-colors duration-200 wishlist-toggle" data-product-id="{{ product.id }}">
+                          <svg class="w-5 h-5 md:w-6 md:h-6 wishlist-icon transition-all duration-200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                          </svg>
+                        </button>
+
+
+                        <div class="p-4">
+                            <h3 class="font-medium text-gray-900 mb-1 truncate text-sm lg:text-base">
+                                <a href="{% url 'website:product_detail' product.slug %}">{{ product.name }}</a>
+                            </h3>
+                            <div class="flex justify-between items-center">
+                                <div class="price text-sm lg:text-base">
+                                    {% if product.sale_price %}
+                                    <span class="text-rose-800 font-semibold">৳{{ product.sale_price|floatformat:'0' }}</span>
+                                    <span class="text-gray-500 text-sm line-through ml-1">
+                                        ৳{{ product.regular_price|floatformat:'0' }}
+                                    </span>
+                                    {% else %}
+                                    <span class="font-semibold text-rose-800">৳{{ product.regular_price|floatformat:'0' }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="col-span-full text-center py-12" id="noProductsFound">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <h3 class="mt-2 text-lg font-medium text-gray-900">No products found</h3>
+                        <p class="mt-1 text-gray-500">Try adjusting your search or filter to find what you're looking for.</p>
+                        <div class="mt-6">
+                            <a href="?" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-rose-900 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-800">
+                                Clear all filters
+                            </a>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if products.paginator.num_pages > 1 %}
+            <div id="pagination" class="mt-10 flex items-center justify-center">
+                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    {% if products.has_previous %}
+                    <a href="?{% modify_query page=products.previous_page_number %}"
+                       class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">Previous</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    {% endif %}
+
+                    {% for num in products.paginator.page_range %}
+                    {% if products.number == num %}
+                    <a href="?{% modify_query page=num %}"
+                       class="relative inline-flex items-center px-4 py-2 border border-rose-800 bg-blue-50 text-sm font-medium text-rose-900">
+                        {{ num }}
+                    </a>
+                    {% else %}
+                    <a href="?{% modify_query page=num %}"
+                       class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        {{ num }}
+                    </a>
+                    {% endif %}
+                    {% endfor %}
+
+                    {% if products.has_next %}
+                    <a href="?{% modify_query page=products.next_page_number %}"
+                       class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">Next</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    {% endif %}
+                </nav>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+</div>
+
+<style>
+    .hidden-category {
+        display: none;
+    }
+    .price-slider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 8px;
+        background: transparent;
+        outline: none;
+        margin: 0;
+        padding: 0;
+        pointer-events: none;
+        z-index: 2;
+    }
+
+    .price-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #820621;
+        cursor: grab;
+        margin-top: -4px;
+        pointer-events: all;
+        box-shadow: 0 0 0 2px rgba(101, 3, 104, 0.4);
+    }
+
+    .price-slider::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #820621;
+        cursor: grab;
+        pointer-events: all;
+        box-shadow: 0 0 0 2px rgba(101, 3, 104, 0.4);
+    }
+
+    #rangeTrack, #mobileRangeTrack {
+        position: absolute;
+        height: 8px;
+        top: 0;
+        background-color: #ab0927;
+        z-index: 1;
+    }
+
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const skeletonLoading = document.getElementById('skeletonLoading');
+    const productGrid = document.getElementById('productGrid');
+    const noProductsFound = document.getElementById('noProductsFound');
+    const pagination = document.getElementById('pagination');
+    const backdrop = document.getElementById('backdrop');
+
+    if ({{ products|length }} > 0) {
+        skeletonLoading.classList.add('hidden');
+        productGrid.classList.remove('hidden');
+        if (noProductsFound) noProductsFound.classList.add('hidden');
+        if (pagination && {{ products.paginator.num_pages }} > 1) pagination.classList.remove('hidden');
+    } else {
+        skeletonLoading.classList.add('hidden');
+        productGrid.classList.remove('hidden');
+        if (noProductsFound) noProductsFound.classList.remove('hidden');
+        if (pagination) pagination.classList.add('hidden');
+    }
+
+    function showLoading() {
+        skeletonLoading.classList.remove('hidden');
+        productGrid.classList.add('hidden');
+        if (noProductsFound) noProductsFound.classList.add('hidden');
+        if (pagination) pagination.classList.add('hidden');
+    }
+
+    function updateUrlParam(key, value) {
+        showLoading();
+        const url = new URL(window.location.href);
+        const params = new URLSearchParams(url.search);
+
+        if (value === '' || value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
+            params.delete(key);
+        } else {
+            if (Array.isArray(value)) {
+                params.delete(key);
+                value.forEach(val => params.append(key, val));
+            } else {
+                params.set(key, value);
+            }
+        }
+
+        if (key !== 'page') {
+             params.delete('page');
+        }
+
+        window.location.href = url.pathname + '?' + params.toString();
+    }
+
+    const minPriceSlider = document.getElementById('minPrice');
+    const maxPriceSlider = document.getElementById('maxPrice');
+    const minPriceValue = document.getElementById('minPriceValue');
+    const maxPriceValue = document.getElementById('maxPriceValue');
+    const rangeTrack = document.getElementById('rangeTrack');
+
+    const minPossiblePriceDesktop = parseFloat(minPriceSlider.min);
+    const maxPossiblePriceDesktop = parseFloat(maxPriceSlider.max);
+    const totalRangeDesktop = maxPossiblePriceDesktop - minPossiblePriceDesktop;
+
+    function updateRangeTrackDesktop() {
+        let minVal = parseFloat(minPriceSlider.value);
+        let maxVal = parseFloat(maxPriceSlider.value);
+
+        if (minVal > maxVal) {
+            minVal = maxVal;
+            minPriceSlider.value = maxVal;
+        }
+        if (maxVal < minVal) {
+            maxVal = minVal;
+            maxPriceSlider.value = minVal;
+        }
+
+        minPriceValue.textContent = '৳' + minVal;
+        maxPriceValue.textContent = '৳' + maxVal;
+
+        const leftPercent = ((minVal - minPossiblePriceDesktop) / totalRangeDesktop) * 100;
+        const widthPercent = ((maxVal - minVal) / totalRangeDesktop) * 100;
+
+        rangeTrack.style.left = leftPercent + '%';
+        rangeTrack.style.width = widthPercent + '%';
+    }
+
+    minPriceSlider.addEventListener('input', updateRangeTrackDesktop);
+    maxPriceSlider.addEventListener('input', updateRangeTrackDesktop);
+
+    document.getElementById('applyPriceFilter').addEventListener('click', function() {
+        const minPrice = minPriceSlider.value;
+        const maxPrice = maxPriceSlider.value;
+        updateUrlParam('min_price', minPrice);
+        updateUrlParam('max_price', maxPrice);
+    });
+
+    document.querySelectorAll('input[type="checkbox"][name^="color"], input[type="checkbox"][name^="size"], input[type="checkbox"][name^="weight"]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const name = this.name;
+            const values = Array.from(document.querySelectorAll(`input[name="${name}"]:checked`))
+                                 .map(el => el.value);
+            updateUrlParam(name, values);
+        });
+    });
+
+    document.getElementById('sortDropdown').addEventListener('change', function() {
+        updateUrlParam('sort_by', this.value);
+    });
+
+    const mobileFilterToggle = document.getElementById('mobileFilterToggle');
+    const mobileFilterOptions = document.getElementById('mobileFilterOptions');
+    const closeMobileFilterOptions = document.getElementById('closeMobileFilterOptions');
+
+    const mobileSortToggle = document.getElementById('mobileSortToggle');
+    const mobileSortOptions = document.getElementById('mobileSortOptions');
+    const closeMobileSortOptions = document.getElementById('closeMobileSortOptions');
+    const sortOptionButtons = mobileSortOptions.querySelectorAll('[data-sort-key]');
+
+    function showPanel(panelElement) {
+        backdrop.classList.remove('hidden');
+        setTimeout(() => {
+            backdrop.classList.add('opacity-100');
+            panelElement.classList.remove('translate-y-full');
+            panelElement.classList.add('translate-y-0');
+        }, 10);
+    }
+
+    function hidePanel(panelElement) {
+        panelElement.classList.remove('translate-y-0');
+        panelElement.classList.add('translate-y-full');
+        backdrop.classList.remove('opacity-100');
+        backdrop.classList.add('opacity-0');
+        setTimeout(() => {
+            backdrop.classList.add('hidden');
+        }, 300);
+    }
+
+    if (mobileFilterToggle) {
+        mobileFilterToggle.addEventListener('click', () => showPanel(mobileFilterOptions));
+    }
+    if (closeMobileFilterOptions) {
+        closeMobileFilterOptions.addEventListener('click', () => hidePanel(mobileFilterOptions));
+    }
+
+    if (mobileSortToggle) {
+        mobileSortToggle.addEventListener('click', () => showPanel(mobileSortOptions));
+    }
+    if (closeMobileSortOptions) {
+        closeMobileSortOptions.addEventListener('click', () => hidePanel(mobileSortOptions));
+    }
+
+    if (backdrop) {
+        backdrop.addEventListener('click', () => {
+            hidePanel(mobileFilterOptions);
+            hidePanel(mobileSortOptions);
+        });
+    }
+
+    const mobileMinPriceSlider = document.getElementById('mobileMinPrice');
+    const mobileMaxPriceSlider = document.getElementById('mobileMaxPrice');
+    const mobileMinPriceValue = document.getElementById('mobileMinPriceValue');
+    const mobileMaxPriceValue = document.getElementById('mobileMaxPriceValue');
+    const mobileRangeTrack = document.getElementById('mobileRangeTrack');
+
+    const minPossiblePriceMobile = parseFloat(mobileMinPriceSlider.min);
+    const maxPossiblePriceMobile = parseFloat(mobileMaxPriceSlider.max);
+    const totalRangeMobile = maxPossiblePriceMobile - minPossiblePriceMobile;
+
+    function updateRangeTrackMobile() {
+        let minVal = parseFloat(mobileMinPriceSlider.value);
+        let maxVal = parseFloat(mobileMaxPriceSlider.value);
+
+        if (minVal > maxVal) {
+            minVal = maxVal;
+            mobileMinPriceSlider.value = maxVal;
+        }
+        if (maxVal < minVal) {
+            maxVal = minVal;
+            mobileMaxPriceSlider.value = minVal;
+        }
+
+        mobileMinPriceValue.textContent = '৳' + minVal;
+        mobileMaxPriceValue.textContent = '৳' + maxVal;
+
+        const leftPercent = ((minVal - minPossiblePriceMobile) / totalRangeMobile) * 100;
+        const widthPercent = ((maxVal - minVal) / totalRangeMobile) * 100;
+
+        mobileRangeTrack.style.left = leftPercent + '%';
+        mobileRangeTrack.style.width = widthPercent + '%';
+    }
+
+    mobileMinPriceSlider.addEventListener('input', updateRangeTrackMobile);
+    mobileMaxPriceSlider.addEventListener('input', updateRangeTrackMobile);
+
+    document.getElementById('applyMobilePriceFilter').addEventListener('click', function() {
+        const minPrice = mobileMinPriceSlider.value;
+        const maxPrice = mobileMaxPriceSlider.value;
+        updateUrlParam('min_price', minPrice);
+        updateUrlParam('max_price', maxPrice);
+        hidePanel(mobileFilterOptions);
+    });
+
+    document.querySelectorAll('input[type="checkbox"][name^="mobile_color"], input[type="checkbox"][name^="mobile_size"], input[type="checkbox"][name^="mobile_weight"]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const name = this.name.replace('mobile_', '');
+            const values = Array.from(document.querySelectorAll(`input[name="mobile_${name}"]:checked`))
+                                 .map(el => el.value);
+            updateUrlParam(name, values);
+        });
+    });
+
+    sortOptionButtons.forEach(button => {
+        button.addEventListener('click', (event) => {
+            const sortKey = event.currentTarget.dataset.sortKey;
+            updateUrlParam('sort_by', sortKey);
+            hidePanel(mobileSortOptions);
+        });
+    });
+
+    updateRangeTrackDesktop();
+    updateRangeTrackMobile();
+
+    const viewAllCategoriesBtn = document.getElementById('viewAllCategoriesBtn');
+    const hiddenMobileCategories = document.querySelectorAll('#categoryList .hidden-category');
+
+    if (viewAllCategoriesBtn) {
+        viewAllCategoriesBtn.addEventListener('click', function() {
+            hiddenMobileCategories.forEach(category => {
+                category.classList.remove('hidden-category');
+            });
+            this.style.display = 'none';
+        });
+    }
+
+    const viewAllDesktopCategoriesBtn = document.getElementById('viewAllDesktopCategoriesBtn');
+    const hiddenDesktopCategories = document.querySelectorAll('#desktopCategoryList .hidden-category');
+
+    if (viewAllDesktopCategoriesBtn) {
+        viewAllDesktopCategoriesBtn.addEventListener('click', function() {
+            hiddenDesktopCategories.forEach(category => {
+                category.classList.remove('hidden-category');
+            });
+            this.style.display = 'none';
+        });
+    }
+
+ function getWishlist() {
+        // Retrieve wishlist from localStorage. If null, return an empty array.
+        const wishlist = localStorage.getItem('wishlist');
+        return wishlist ? JSON.parse(wishlist) : [];
+    }
+
+    function saveWishlist(wishlist) {
+        // Save the updated wishlist back to localStorage.
+        localStorage.setItem('wishlist', JSON.stringify(wishlist));
+        // Optional: If you still need a cookie for server-side initial checks, keep this.
+        // document.cookie = `wishlist_ids=${JSON.stringify(wishlist)}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+    }
+
+    function updateWishlistIcon(productId, isAdded) {
+        // Find all wishlist buttons for a given product ID (important for multiple instances on one page)
+        document.querySelectorAll(`.wishlist-toggle[data-product-id="${productId}"]`).forEach(button => {
+            const icon = button.querySelector('.wishlist-icon');
+            if (icon) {
+                if (isAdded) {
+                    // Apply red fill for added state
+                    icon.classList.add('fill-red-500');
+                    icon.classList.remove('fill-none', 'stroke-gray-400'); // Remove empty state classes
+                } else {
+                    // Apply no fill and gray stroke for removed state
+                    icon.classList.remove('fill-red-500');
+                    icon.classList.add('fill-none', 'stroke-gray-400'); // Add empty state classes
+                }
+            }
+        });
+    }
+
+    // Get all wishlist toggle buttons on the page
+    const wishlistToggles = document.querySelectorAll('.wishlist-toggle');
+
+    // Iterate over each button to set its initial state and add event listener
+    wishlistToggles.forEach(button => {
+        // Ensure productId is treated as a string for localStorage consistency
+        const productId = String(button.dataset.productId);
+        
+        // **Initial state setup (on page load)**
+        const currentWishlist = getWishlist();
+        if (currentWishlist.includes(productId)) {
+            updateWishlistIcon(productId, true); // Mark as added
+        } else {
+            updateWishlistIcon(productId, false); // Mark as not added
+        }
+
+        // Add click event listener to toggle wishlist state
+        button.addEventListener('click', function(event) {
+            event.preventDefault(); // Prevent default button behavior (e.g., form submission)
+            event.stopPropagation(); // Stop event from bubbling up (e.g., to product link)
+
+            let wishlist = getWishlist(); // Get current wishlist
+            const index = wishlist.indexOf(productId); // Check if product is already in wishlist
+
+            if (index > -1) {
+                // Product is in wishlist, remove it
+                wishlist.splice(index, 1);
+                updateWishlistIcon(productId, false);
+            } else {
+                // Product is not in wishlist, add it
+                wishlist.push(productId);
+                updateWishlistIcon(productId, true);
+            }
+            saveWishlist(wishlist); // Save updated wishlist to localStorage
+        });
+    });
+});
+</script>
+
+<!-- view all sub category  -->
+<script>
+  function toggleSubcategories(id, btn) {
+    const list = document.getElementById(id);
+    const icon = btn.querySelector('svg');
+
+    if (list.classList.contains('hidden')) {
+      list.classList.remove('hidden');
+      icon.classList.add('rotate-180');
+    } else {
+      list.classList.add('hidden');
+      icon.classList.remove('rotate-180');
+    }
+  }
+    function toggleSubcategories(id, button) {
+    const ul = document.getElementById(id);
+    const icon = button.querySelector('svg');
+    ul.classList.toggle('hidden');
+    icon.classList.toggle('rotate-180');
+  }
+</script>
+{% endblock %}

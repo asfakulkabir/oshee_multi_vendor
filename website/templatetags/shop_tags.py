@@ -30,3 +30,25 @@ def modify_query(context, **kwargs):
             final_params.append((key, val))
 
     return urlencode(final_params)
+
+
+@register.filter
+def mask_name(full_name):
+    if not full_name:
+        return ""
+    
+    # Split the name into parts (handling first and last names)
+    parts = full_name.split()
+    
+    # Get the first letter of the first name part
+    first_initial = parts[0][0] if parts else ""
+    
+    # Get the last letter of the last name part (if multiple parts exist, 
+    # otherwise use the first part's last letter)
+    if len(parts) > 1:
+        last_initial = parts[-1][-1]
+    else:
+        last_initial = first_initial # Or handle as needed if only a single name is provided
+
+    # Construct the masked name using 5 asterisks for consistency
+    return f"{first_initial}*****{last_initial}"

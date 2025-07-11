@@ -29,8 +29,10 @@
                 <span>Total</span>
                 <span id="total-price">৳0</span>
             </div>
-            <button id="clear-cart" class="mt-4 w-full bg-red-600 text-white p-2 rounded hover:bg-red-700">Clear Cart</button>
-            <a href="{% url 'website:checkout_ecommerce' %}" class="mt-4 w-full bg-green-600 text-white p-2 rounded hover:bg-green-700 flex items-center text-center justify-center">Checkout</a>
+            <div class="flex gap-2">
+            <button id="clear-cart" class="mt-4 w-full bg-gray-600 text-white p-2 rounded hover:bg-gray-700">Clear Cart</button>
+            <a href="{% url 'website:checkout_ecommerce' %}" class="mt-4 w-full bg-rose-800 text-white p-2 rounded hover:bg-rose-900 flex items-center text-center justify-center">Checkout</a>
+            </div>
         </div>
     </nav>
 </div>

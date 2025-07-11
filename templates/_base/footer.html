@@ -1,4 +1,108 @@
 {% load custom_tags %}
+<div class="bg-gray-900 text-gray-200 p-8 font-sans shadow-2xl">
+    <div class="mx-auto flex flex-col lg:flex-row lg:justify-center lg:space-x-8">
+        <div class="flex-1 p-4 lg:p-10 mb-8 lg:mb-0 items-center text-center lg:w-1/2 bg-gray-950">
+            <h2 class="text-white text-2xl font-light mb-6">Need Help?</h2>
+            <div class="text-start lg:text-left flex flex-col space-y-6">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="w-1/2 md:w-auto">
+                        <div class="text-gray-100 font-light text-md">Get in touch +44 (0) 121 663 0409</div>
+                        <div class="text-gray-300 font-thin text-sm">24/7 available customer service</div>
+                    </div>
+                    <a href="#"
+                        class="bg-gray-800 text-gray-200 border border-gray-700 px-4 py-2 rounded-md hover:bg-rose-900 transition-colors duration-200 shadow-md text-sm font-thin w-36 text-center">Call
+                        Us</a>
+                </div>
+                <div class="flex justify-between items-center mb-6">
+                    <div class="w-1/2 md:w-auto">
+                        <div class="text-gray-100 font-light text-md">Track your order</div>
+                        <div class="text-gray-300 font-thin text-sm">Want to know if your order is processed and
+                            dispatched?</div>
+                    </div>
+                    <a href="{% url 'website:track_order' %}"
+                        class="bg-gray-800 text-gray-200 border border-gray-700 px-4 py-2 rounded-md hover:bg-rose-900 transition-colors duration-200 shadow-md text-sm font-thin w-36 text-center">Order
+                        Tracking</a>
+                </div>
+                <div class="flex justify-between items-center mb-6">
+                    <div class="w-1/2 md:w-auto">
+                        <div class="text-gray-100 font-light text-md">For Sale Inquiry</div>
+                        <div class="text-gray-300 font-thin text-sm">Don’t hesitate</div>
+                    </div>
+                    <a href="#"
+                        class="bg-gray-800 text-gray-200 border border-gray-700 px-4 py-2 rounded-md hover:bg-rose-900 transition-colors duration-200 shadow-md text-sm font-thin w-36 text-center">Email
+                        Us</a>
+                </div>
+                <div class="flex justify-between items-center mb-6">
+                    <div class="w-1/2 md:w-auto">
+                        <div class="text-gray-100 font-light text-md">Chat with Us</div>
+                        <div class="text-gray-300 font-thin text-sm">With our expert designer</div>
+                    </div>
+                    <a href="#"
+                        class="bg-gray-800 text-gray-200 border border-gray-700 px-4 py-2 rounded-md hover:bg-rose-900 transition-colors duration-200 shadow-md text-sm font-thin w-36 text-center">Live
+                        Chat</a>
+                </div>
+                <div class="flex justify-between items-center">
+                    <div class="w-1/2 md:w-auto">
+                        <div class="text-gray-100 font-light text-md">WhatsApp</div>
+                        <div class="text-gray-300 font-thin text-sm">You can WhatsApp +44 7494872020</div>
+                    </div>
+                    <a href="#"
+                        class="bg-gray-800 text-gray-200 border border-gray-700 px-4 py-2 rounded-md hover:bg-rose-900 transition-colors duration-200 shadow-md text-sm font-thin w-36 text-center">WhatsApp</a>
+                </div>
+            </div>
+        </div>
+        <div class="flex-1 p-4 lg:p-10 text-center lg:w-1/2 bg-gray-950">
+            <h2 class="text-white text-2xl font-light mb-6">Shop Address</h2>
+            <div class="w-1/2 md:w-auto text-gray-300 leading-relaxed mb-6 font-thin text-sm">
+                <div class="text-gray-100 font-light text-md mb-1">OsheeBD</div>
+                Unit 107 Watchmoor Trade Centre<br>
+                Watchmoor Rd, Camberley<br>
+                Surrey GU15 3AJ<br>
+                United Kingdom
+            </div>
+            <div class="text-gray-300 font-thin text-sm mb-8">
+                For Sale Inquiry:
+                <a href="mailto:sales@osheebd.com"
+                    class="text-gray-200 hover:underline transition-colors duration-200">sales@osheebd.com</a>
+            </div>
+            <h2 class="text-white text-2xl font-light mb-4">Stay in touch</h2>
+            <div class="flex justify-center items-center space-x-4 mb-8">
+                <a href="#" class="text-blue-600 hover:text-blue-800">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M22.46 6c-.77.34-1.6.57-2.46.67a4.3 4.3 0 001.88-2.37 8.47 8.47 0 01-2.7 1.04 4.23 4.23 0 00-7.2 3.86 12 12 0 01-8.7-4.41 4.23 4.23 0 001.3 5.64A4.19 4.19 0 012 9.5v.05a4.23 4.23 0 003.39 4.14 4.27 4.27 0 01-1.91.07 4.24 4.24 0 003.95 2.94A8.5 8.5 0 012 19.54a11.9 11.9 0 006.29 1.84c7.55 0 11.68-6.26 11.68-11.69 0-.18 0-.36-.01-.53A8.36 8.36 0 0024 4.59a8.28 8.28 0 01-2.36.65 4.2 4.2 0 001.84-2.31z" />
+                    </svg>
+                </a>
+                <a href="#" class="text-blue-800 hover:text-blue-900">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M22 12a10 10 0 10-11.5 9.95v-7.05h-2.17V12H10.5V9.8c0-2.14 1.27-3.33 3.22-3.33.93 0 1.9.17 1.9.17v2.1h-1.07c-1.05 0-1.37.65-1.37 1.31V12h2.34l-.37 2.9h-1.97v7.05A10.02 10.02 0 0022 12z" />
+                    </svg>
+                </a>
+                <a href="#" class="text-pink-600 hover:text-pink-700">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M7.5 2A5.5 5.5 0 002 7.5v9A5.5 5.5 0 007.5 22h9a5.5 5.5 0 005.5-5.5v-9A5.5 5.5 0 0016.5 2h-9zM12 7.5A4.5 4.5 0 1112 16.5 4.5 4.5 0 0112 7.5zm6.25-.88a1.13 1.13 0 110 2.25 1.13 1.13 0 010-2.25z" />
+                    </svg>
+                </a>
+                <a href="#" class="text-green-600 hover:text-green-700">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 448 512">
+                        <path
+                            d="M380.9 97.1c-44.2-44.2-115.9-44.2-160.1 0l-10.4 10.4-10.4-10.4c-44.2-44.2-115.9-44.2-160.1 0s-44.2 115.9 0 160.1l170.5 170.5c4.7 4.7 12.3 4.7 17 0L380.9 257.2c44.2-44.2 44.2-115.9 0-160.1z" />
+                    </svg>
+                </a>
+                <a href="#" class="text-purple-600 hover:text-purple-700">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M16.58 7.5c.77 0 1.42-.65 1.42-1.42s-.65-1.42-1.42-1.42-1.42.65-1.42 1.42.65 1.42 1.42 1.42zM12 2.04a10 10 0 100 19.92A10 10 0 0012 2.04zM12 17.9a5.9 5.9 0 110-11.8 5.9 5.9 0 010 11.8z" />
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 <section class="bg-gray-900 text-gray-300 py-5 md:py-8">
     <div class="mx-auto px-4 sm:px-6 lg:px-8">
         <h3 class="text-lg font-extrabold text-white mb-2 text-center md:text-left">Top Categories</h3>
@@ -6,11 +110,11 @@
             {% for category in footer_categories %}
             <div class="whitespace-nowrap">
                 <a href="{% url 'website:category_detail' full_slug=category.get_full_slug %}"
-                   class="font-light text-gray-400 hover:text-white transition-colors duration-300 \">
+                    class="font-light text-gray-400 hover:text-white transition-colors duration-300 \">
                     {{ category.name }}
                 </a>
                 {% if not forloop.last %}
-                    <span class="text-gray-600 text-lg ml-4">|</span>
+                <span class="text-gray-600 text-lg ml-4">|</span>
                 {% endif %}
             </div>
             {% endfor %}
@@ -69,6 +173,21 @@
                 </ul>
             </div>
 
+            <div class="lg:pl-8">
+                <h3 class="text-xl font-bold text-white mb-5">Customer Support</h3>
+                <ul class="space-y-3">
+                    <li><a href="#" class="text-base hover:text-white transition-colors duration-300">Shipping
+                            Information</a></li>
+                    <li><a href="#" class="text-base hover:text-white transition-colors duration-300">Returns &
+                            Exchanges</a></li>
+                    <li><a href="#" class="text-base hover:text-white transition-colors duration-300">Track Your
+                            Order</a></li>
+                    <li><a href="#" class="text-base hover:text-white transition-colors duration-300">Size Guide</a>
+                    </li>
+                    <li><a href="#" class="text-base hover:text-white transition-colors duration-300">Help Center</a>
+                    </li>
+                </ul>
+            </div>
 
         </div>
 

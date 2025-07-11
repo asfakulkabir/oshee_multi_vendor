@@ -22,6 +22,7 @@ def home(request):
     mobile_banners = Banner.objects.filter(is_active=True, for_mobile=True).order_by('-created_at')
     categories = Category.objects.all()[:13]
     popular_products = Product.objects.filter(is_featured=True)[:8]
+    home_components = HomeComponents.objects.all()
     return render(request, 'website/home.html', {
         'categories': categories,
         'popular_products': popular_products,
@@ -29,6 +30,7 @@ def home(request):
         'mobile_banners': mobile_banners,
         'testimonials_desktop': testimonials_desktop,
         'testimonials_mobile': testimonials_mobile,
+        'home_components':home_components,
     })
 
 def category_detail(request, full_slug=None):
@@ -488,3 +490,187 @@ def order_success(request):
         'orderid': order.id,
         'items_json': items_json_data # Pass the parsed JSON directly
     })
+
+
+
+def search(request):
+    products = Product.objects.filter(is_active=True).prefetch_related('images', 'variations')
+
+    category_slug = request.GET.get('category')
+    min_price_param = request.GET.get('min_price')
+    max_price_param = request.GET.get('max_price')
+    search_query = request.GET.get('search')
+    color_filter = request.GET.getlist('color')
+    size_filter = request.GET.getlist('size')
+    weight_filter = request.GET.getlist('weight')
+    sort_by = request.GET.get('sort_by', '-created_at')
+
+    all_active_products = Product.objects.filter(is_active=True)
+
+    overall_price_aggregates = all_active_products.aggregate(
+        min_p=Min('regular_price'),
+        max_p=Max('regular_price')
+    )
+
+    overall_min_price = overall_price_aggregates['min_p'] if overall_price_aggregates['min_p'] is not None else 0
+    overall_max_price = overall_price_aggregates['max_p'] if overall_price_aggregates['max_p'] is not None else 1000
+    overall_max_price += 100
+
+    selected_min_from_url = None
+    selected_max_from_url = None
+
+    try:
+        if min_price_param:
+            selected_min_from_url = float(min_price_param)
+    except ValueError:
+        pass
+
+    try:
+        if max_price_param:
+            selected_max_from_url = float(max_price_param)
+    except ValueError:
+        pass
+
+    min_price_filter = selected_min_from_url if selected_min_from_url is not None else overall_min_price
+    max_price_filter = selected_max_from_url if selected_max_from_url is not None else overall_max_price
+
+    if max_price_filter < min_price_filter:
+        max_price_filter = min_price_filter
+
+    if category_slug:
+        if '/' in category_slug:
+            last_slug = category_slug.split('/')[-1]
+            category = Category.objects.filter(slug=last_slug).first()
+        else:
+            category = Category.objects.filter(slug=category_slug).first()
+
+        if category:
+            def get_descendants(cat):
+                descendants = list(cat.children.all())
+                for child in cat.children.all():
+                    descendants.extend(get_descendants(child))
+                return descendants
+
+            all_categories = [category] + get_descendants(category)
+            products = products.filter(categories__in=all_categories).distinct()
+
+    if min_price_filter is not None or max_price_filter is not None:
+        if min_price_filter is not None and max_price_filter is not None:
+            products = products.filter(
+                Q(regular_price__gte=min_price_filter, regular_price__lte=max_price_filter) |
+                Q(sale_price__gte=min_price_filter, sale_price__lte=max_price_filter, sale_price__isnull=False)
+            ).distinct()
+        elif min_price_filter is not None:
+            products = products.filter(
+                Q(regular_price__gte=min_price_filter) |
+                Q(sale_price__gte=min_price_filter, sale_price__isnull=False)
+            ).distinct()
+        elif max_price_filter is not None:
+            products = products.filter(
+                Q(regular_price__lte=max_price_filter) |
+                Q(sale_price__lte=max_price_filter, sale_price__isnull=False)
+            ).distinct()
+
+    if search_query:
+        products = products.filter(
+            Q(name__icontains=search_query) |
+            Q(short_description__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(categories__name__icontains=search_query)
+        ).distinct()
+
+    variation_filters = Q()
+    if color_filter:
+        variation_filters &= Q(variations__color__in=color_filter)
+    if size_filter:
+        variation_filters &= Q(variations__size__in=size_filter)
+    if weight_filter:
+        variation_filters &= Q(variations__weight__in=weight_filter)
+
+    if variation_filters:
+        products = products.filter(variation_filters).distinct()
+
+    valid_sort_options = {
+        '-created_at': 'Newest',
+        'created_at': 'Oldest',
+        'name': 'Name (A-Z)',
+        '-name': 'Name (Z-A)',
+        'regular_price': 'Price (Low to High)',
+        '-regular_price': 'Price (High to Low)',
+    }
+
+    if sort_by in valid_sort_options:
+        products = products.order_by(sort_by)
+    else:
+        sort_by = '-created_at'
+        products = products.order_by(sort_by)
+
+    available_filters = {
+        'colors': ProductVariation.objects.filter(product__in=all_active_products)
+                                .exclude(color__isnull=True).exclude(color__exact='')
+                                .values_list('color', flat=True).distinct().order_by('color'),
+        'sizes': ProductVariation.objects.filter(product__in=all_active_products)
+                                .exclude(size__isnull=True).exclude(size__exact='')
+                                .values_list('size', flat=True).distinct().order_by('size'),
+        'weights': ProductVariation.objects.filter(product__in=all_active_products)
+                                .exclude(weight__isnull=True).exclude(weight__exact='')
+                                .values_list('weight', flat=True).distinct().order_by('weight'),
+    }
+
+    paginator = Paginator(products, 50)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    wishlist_ids_cookie_str = request.COOKIES.get('wishlist_ids', '[]')
+    try:
+        initial_wishlist_ids = json.loads(wishlist_ids_cookie_str)
+        initial_wishlist_ids = [str(id) for id in initial_wishlist_ids]
+    except json.JSONDecodeError:
+        initial_wishlist_ids = []
+
+
+    context = {
+        'products': page_obj,
+        'categories': Category.objects.filter(parent__isnull=True),
+        'min_price': overall_min_price,
+        'max_price': overall_max_price,
+        'selected_min': min_price_filter,
+        'selected_max': max_price_filter,
+        'available_filters': available_filters,
+        'selected_colors': color_filter,
+        'selected_sizes': size_filter,
+        'selected_weights': weight_filter,
+        'sort_options': valid_sort_options,
+        'current_sort': sort_by,
+        'search_query': search_query or '',
+        'current_category': category_slug or '',
+        'wishlist_ids': initial_wishlist_ids,
+    }
+
+    return render(request, 'website/search.html', context)
+
+def track_order(request):
+    orders = None
+    phone_number = None
+    error_message = None
+
+    if request.method == 'POST':
+        phone_number = request.POST.get('phone_number')
+
+        if phone_number:
+            cleaned_phone_number = phone_number.strip().replace(" ", "")
+
+            orders = Ecommercecheckouts.objects.filter(customer_phone=cleaned_phone_number).order_by('-created_at')
+
+            if not orders.exists():
+                error_message = f"No orders found for mobile number: {phone_number}"
+        else:
+            error_message = "Please enter a mobile number."
+
+    context = {
+        'orders': orders,
+        'phone_number': phone_number,
+        'error_message': error_message,
+    }
+
+    return render(request, 'website/track_order.html', context)
