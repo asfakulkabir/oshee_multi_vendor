@@ -28,8 +28,8 @@
       <li><a href="{% url 'website:shop' %}"
           class="font-medium text-pink-600 underline-offset-2 hover:text-pink-700 focus:outline-hidden focus:underline text-sm"
           aria-current="page">Shop</a></li>
-      <li><a href="#"
-          class="font-medium text-gray-700 underline-offset-2 hover:text-pink-700 focus:outline-hidden focus:underline text-sm">Pricing</a>
+      <li><a href="{% url 'website:track_order' %}"
+          class="font-medium text-gray-700 underline-offset-2 hover:text-pink-700 focus:outline-hidden focus:underline text-sm">Tracking</a>
       </li>
       <li><a href="{% url 'website:wishlist_page' %}">
           <svg class="w-8 h-8" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" fill="none"
@@ -53,26 +53,36 @@
           x-on:click.outside="userDropDownIsOpen = false, openWithKeyboard = false"
           x-on:keydown.down.prevent="$focus.wrap().next()" x-on:keydown.up.prevent="$focus.wrap().previous()"
           id="userMenu"
-          class="absolute right-0 top-12 flex w-fit min-w-48 flex-col overflow-hidden rounded border border-gray-300 bg-white py-1.5 z-30">
+          class="absolute right-0 top-10 flex w-fit min-w-48 flex-col overflow-hidden rounded border border-gray-300 bg-white py-1.5 z-30">
+          {% if user.is_authenticated %}
           <li class="border-b border-gray-300">
             <div class="flex flex-col px-4 py-2">
-              <span class="text-sm font-medium text-gray-900">Alice Brown</span>
-              <p class="text-xs text-gray-700">alice.brown@gmail.com</p>
+              <span class="text-sm font-medium text-gray-900">{{ user.get_full_name }}</span>
+              <p class="text-xs text-gray-700">{{ user.email }}</p>
             </div>
           </li>
-          <li><a href="#"
-              class="block bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-50 hover:text-gray-900 focus-visible:bg-gray-100 focus-visible:text-gray-900 focus-visible:outline-hidden">Dashboard</a>
+          <li>
+            <a href="{% url 'dashboard:vendor_dashboard' %}"
+              class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:bg-gray-100">Dashboard</a>
           </li>
-          <li><a href="#"
-              class="block bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-50 hover:text-gray-900 focus-visible:bg-gray-100 focus-visible:text-gray-900 focus-visible:outline-hidden">Subscription</a>
+          <li>
+            <a href="{% url 'dashboard:vendor_profile_view' %}"
+              class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:bg-gray-100">Profile</a>
           </li>
-          <li><a href="#"
-              class="block bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-50 hover:text-gray-900 focus-visible:bg-gray-100 focus-visible:text-gray-900 focus-visible:outline-hidden">Settings</a>
+          <li>
+            <a href="{% url 'accounts:logout' %}"
+              class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:bg-gray-100">Logout</a>
           </li>
-          <li><a href="#"
-              class="block bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-50 hover:text-gray-900 focus-visible:bg-gray-100 focus-visible:text-gray-900 focus-visible:outline-hidden">Sign
-              Out</a></li>
-
+          {% else %}
+          <li>
+            <a href="{% url 'accounts:vendor_register' %}"
+              class="block px-4 py-2 text-sm text-rose-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100">Become a Vendor</a>
+          </li>    
+          <li>
+            <a href="{% url 'accounts:login' %}"
+              class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:bg-gray-100">Login</a>
+          </li>        
+          {% endif %}
         </ul>
       </li>
 
@@ -219,29 +229,43 @@
       class="fixed max-h-screen overflow-y-auto inset-x-0 top-0 z-10 flex flex-col rounded-b border-b border-gray-300 bg-white px-8 pb-6 pt-10 sm:hidden">
       <li class="mb-4 border-none">
         <div class="flex items-center gap-2 py-2">
+          {% if user.is_authenticated %}
           <img src="https://penguinui.s3.amazonaws.com/component-assets/avatar-8.webp" alt="User Profile"
             class="h-12 w-12 rounded-full object-cover" />
           <div>
-            <span class="font-medium text-gray-900">Alice Brown</span>
-            <p class="text-sm text-gray-700">alice.brown@gmail.com</p>
+            <span class="font-medium text-gray-900">{{ user.get_full_name }}</span>
+            <p class="text-sm text-gray-700">{{ user.email }}</p>
           </div>
+          {% else %}
+          <img src="https://penguinui.s3.amazonaws.com/component-assets/avatar-8.webp" alt="User Profile"
+            class="h-12 w-12 rounded-full object-cover" />
+          <div>
+            <span class="font-medium text-gray-900">Guest</span>
+            <p class="text-sm text-gray-700">Not logged in</p>
+          </div>
+          {% endif %}
         </div>
       </li>
-      <li class="p-2"><a href="#" class="w-full text-lg font-bold text-pink-600 focus:underline"
-          aria-current="page">Products</a></li>
-      <li class="p-2"><a href="#" class="w-full text-lg font-medium text-gray-700 focus:underline">Pricing</a></li>
-      <li class="p-2"><a href="#" class="w-full text-lg font-medium text-gray-700 focus:underline">Blog</a></li>
+      <li class="p-2"><a href="{% url 'website:shop' %}" class="w-full text-lg font-bold text-pink-600 focus:underline"
+          aria-current="page">Shop</a></li>
+      <li class="p-2"><a href="{% url 'website:track_order' %}" class="w-full text-lg font-medium text-gray-700 focus:underline">Tracking</a></li>
       <hr role="none" class="my-2 border-gray-300">
-      <li class="p-2"><a href="#" class="w-full text-gray-900 focus:underline">Dashboard</a></li>
-      <li class="p-2"><a href="#" class="w-full text-gray-900 focus:underline">Subscription</a></li>
+      {% if user.is_authenticated %}
+      <li class="p-2"><a href="{% url 'dashboard:vendor_dashboard' %}" class="w-full text-gray-900 focus:underline">Dashboard</a></li>
+      <li class="p-2"><a href="{% url 'dashboard:vendor_profile_view' %}" class="w-full text-gray-900 focus:underline">Profile</a></li>
       <li class="p-2"><a href="#" class="w-full text-gray-900 focus:underline">Settings</a></li>
       <!-- CTA Button -->
-      <li class="mt-4 w-full border-none"><a href="#"
+      <li class="mt-4 w-full border-none"><a href="{% url 'accounts:logout' %}"
           class="rounded bg-pink-600 border border-pink-600 px-4 py-2 block text-center font-medium tracking-wide text-white hover:opacity-75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-600 active:opacity-100 active:outline-offset-0">Sign
           Out</a></li>
+          {% else %}
+      <li class="p-2"><a href="{% url 'accounts:vendor_register' %}" class="w-full text-gray-900 focus:underline">Become a Vendor</a></li>
+      <li class="mt-4 w-full border-none"><a href="{% url 'accounts:login' %}"
+          class="rounded bg-pink-600 border border-pink-600 px-4 py-2 block text-center font-medium tracking-wide text-white hover:opacity-75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-600 active:opacity-100 active:outline-offset-0">Sign
+          In</a></li>
+      {% endif %}
     </ul>
   </nav>
-
   
   <nav class="bg-white border-b border-b-slate-400 w-full hidden lg:block" x-data="{ openIndex: null }"
     style="position: relative;">

@@ -1,0 +1,56 @@
+{% extends "_base/_base.html" %}
+{% load custom_filters %}
+
+{% block title %}Vendor Registration{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center py-4 lg:py-12 px-4 sm:px-6 lg:px-8">
+    <div class="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-8 lg:p-12 border border-gray-100">
+        <div class="text-center">
+            <h2 class="text-xl md:text-2xl lg:text-3xl xl:text-4xl font-extrabold text-gray-900 tracking-tight">Become a Vendor</h2>
+            <p class="mt-4 text-base lg:text-lg text-gray-500 max-w-lg mx-auto">
+                Join our curated marketplace by submitting your company details. We're excited to partner with you.
+            </p>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" class="mt-12 space-y-8">
+            {% csrf_token %}
+            {% for field in form %}
+                <div>
+                    <label for="{{ field.id_for_label }}" class="block text-sm font-semibold text-gray-700">
+                        {{ field.label }}
+                        {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+                    </label>
+                    {{ field|add_class:"mt-1 block w-full px-4 py-3 rounded-md border-gray-300 shadow-sm focus:ring-rose-500 focus:border-rose-500 sm:text-base transition duration-150 ease-in-out" }}
+                    {% if field.help_text %}
+                        <p class="text-xs text-gray-500 mt-2">{{ field.help_text }}</p>
+                    {% endif %}
+                    {% if field.errors %}
+                        <ul class="mt-2 text-sm text-red-600 list-disc list-inside">
+                            {% for error in field.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            {% endfor %}
+
+            <div>
+                <button type="submit" class="w-full flex justify-center items-center gap-2 py-4 px-6 bg-rose-800 text-white font-bold rounded-lg shadow-lg transition-all duration-300 ease-in-out hover:bg-rose-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-700">
+                    <svg class="w-5 h-5 -ml-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                    Submit Application
+                </button>
+            </div>
+        </form>
+
+        <p class="mt-10 text-center text-sm text-gray-500">
+            Already a partner?
+            <a href="{% url 'accounts:login' %}" class="font-medium text-rose-800 hover:text-rose-900 underline transition duration-150">
+                Sign in to your account
+            </a>
+        </p>
+    </div>
+</div>
+{% endblock %}

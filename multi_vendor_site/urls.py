@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
 from django.urls import path, include, re_path
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns # new
+from django.contrib.auth import views as auth_views
 from django.views.static import serve
 from django.conf import settings
 from django.conf.urls.static import static
@@ -12,6 +13,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('website.urls')),
     path('accounts/', include('accounts.urls')),  #Include the website app URLs
+
     path('dashboard/', include('dashboard.urls')),
 ]
 

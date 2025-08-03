@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -27,8 +28,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-
+    
     'compressor',  # new
     'import_export',
     'ckeditor',
@@ -106,6 +106,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
@@ -165,3 +166,14 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+#new for vendor profile
+AUTHENTICATION_BACKENDS = [
+    'accounts.backends.EmailOrPhoneNumberBackend', # Our custom backend
+    'django.contrib.auth.backends.ModelBackend',   # Django's default backend (keep it as a fallback)
+]
+# Redirect URLs after login/logout
+LOGIN_REDIRECT_URL = '/' # Or wherever you want users to go after login
+LOGOUT_REDIRECT_URL = '/login/' # Or your login page
+LOGIN_URL = '/login/' # URL for login page (used by @login_required decorator)

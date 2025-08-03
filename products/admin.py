@@ -3,18 +3,19 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.db.models import Sum
+from django.contrib import messages
 from django.conf import settings
 from django.core.files import File
-from django.db import transaction 
-
+from django.db import transaction
+from import_export.formats.base_formats import CSV, XLSX 
 from import_export import resources, fields
 from import_export.admin import ImportExportModelAdmin
 from import_export.widgets import ForeignKeyWidget, ManyToManyWidget
-
 from .models import *
+from import_export import resources
 
 from django.contrib.auth import get_user_model
-User = get_user_model() 
+User = get_user_model()
 
 
 class ProductImageInline(admin.TabularInline):
@@ -30,7 +31,7 @@ class ProductImageInline(admin.TabularInline):
     image_thumbnail.short_description = "Thumbnail"
 
 
-class ProductVariationInline(admin.TabularInline): 
+class ProductVariationInline(admin.TabularInline):
     model = ProductVariation
     extra = 1
     fields = ('size', 'weight', 'color', 'price', 'stock')
@@ -50,13 +51,17 @@ class CategoryResource(resources.ModelResource):
         parent_name = row.get('parent_name')
         if parent_name:
             Category.objects.get_or_create(name=parent_name)
-        
+    
+    def get_import_encoding(self):
+        return 'utf-8'
+    
     class Meta:
         model = Category
         import_id_fields = ('slug',)
         fields = ('name', 'slug', 'parent', 'group_name', 'image')
         export_order = ('name', 'slug', 'parent', 'group_name', 'image')
         skip_unchanged = True
+        encoding = 'utf-8'
 
 
 class ProductImageResource(resources.ModelResource):
@@ -68,12 +73,12 @@ class ProductImageResource(resources.ModelResource):
     image_path = fields.Field(
         column_name='image_path',
         attribute='image',
-        readonly=False 
+        readonly=False
     )
 
     def dehydrate_image_path(self, product_image):
         if product_image.image:
-            return product_image.image.name 
+            return product_image.image.name
         return ''
 
     def before_import_row(self, row, **kwargs):
@@ -88,14 +93,14 @@ class ProductImageResource(resources.ModelResource):
                 self._current_image_filename = os.path.basename(abs_path)
             else:
                 self.errors.append(f"Image file not found at {abs_path} for row: {row}")
-                row['image_path'] = None 
+                row['image_path'] = None
 
     def after_import_instance(self, instance, new, **kwargs):
         if self._current_image_abs_path and self._current_image_filename:
             try:
                 with open(self._current_image_abs_path, 'rb') as f:
                     instance.image.save(self._current_image_filename, File(f, name=self._current_image_filename), save=False)
-                    instance.save(update_fields=['image']) 
+                    instance.save(update_fields=['image'])
             except Exception as e:
                 self.errors.append(f"Error saving image '{self._current_image_filename}' for ProductImage ID {instance.id}: {e}")
         elif not instance.image and instance.pk and 'image_path' in kwargs['row'] and not kwargs['row']['image_path']:
@@ -104,12 +109,16 @@ class ProductImageResource(resources.ModelResource):
                 instance.image = None
                 instance.save(update_fields=['image'])
 
+    def get_import_encoding(self):
+        return 'utf-8'
+
     class Meta:
         model = ProductImage
         import_id_fields = ('product', 'name')
         fields = ('product', 'name', 'alt_text', 'is_featured', 'order', 'image_path')
         export_order = ('product', 'name', 'alt_text', 'is_featured', 'order', 'image_path')
         skip_unchanged = True
+        encoding = 'utf-8'
 
 
 class ProductVariationResource(resources.ModelResource):
@@ -119,24 +128,28 @@ class ProductVariationResource(resources.ModelResource):
         widget=ForeignKeyWidget(Product, 'slug')
     )
 
+    def get_import_encoding(self):
+        return 'utf-8'
+
     class Meta:
         model = ProductVariation
-        import_id_fields = ('product', 'size', 'weight', 'color') 
+        import_id_fields = ('product', 'size', 'weight', 'color')
         fields = ('product', 'size', 'weight', 'color', 'price', 'stock')
         export_order = ('product', 'size', 'weight', 'color', 'price', 'stock')
         skip_unchanged = True
+        encoding = 'utf-8'
 
 
 class ProductResource(resources.ModelResource):
     vendor = fields.Field(
         column_name='vendor_username',
         attribute='vendor',
-        widget=ForeignKeyWidget(User, 'username') 
+        widget=ForeignKeyWidget(User, 'username')
     )
     categories = fields.Field(
         column_name='category_names',
         attribute='categories',
-        widget=ManyToManyWidget(Category, field='name', separator='|') 
+        widget=ManyToManyWidget(Category, field='name', separator='|')
     )
 
     exported_images = fields.Field(column_name='exported_images', readonly=True)
@@ -147,7 +160,10 @@ class ProductResource(resources.ModelResource):
             f"{img.name or 'Unnamed'}:{img.image.name if img.image else ''}:{img.alt_text or ''}:{int(img.is_featured)}:{img.order}"
             for img in product.images.all()
         ])
-
+    
+    def get_import_encoding(self):
+        return 'utf-8'
+    
     def dehydrate_exported_variations(self, product):
         return '|'.join([
             f"{var.size or ''}:{var.weight or ''}:{var.color or ''}:{var.price or ''}:{var.stock or ''}"
@@ -172,18 +188,18 @@ class ProductResource(resources.ModelResource):
         if vendor_username:
             User.objects.get_or_create(username=vendor_username)
 
-    @transaction.atomic 
+    @transaction.atomic
     def after_import_instance(self, instance, new, **kwargs):
         row_data = self._row_data_by_slug.get(instance.slug)
         if not row_data:
-            return 
+            return
 
         images_data_str = row_data.get('exported_images', '')
         if images_data_str:
-            instance.images.all().delete() 
+            instance.images.all().delete()
             for image_entry in images_data_str.split('|'):
                 parts = image_entry.split(':')
-                if len(parts) < 5: 
+                if len(parts) < 5:
                     continue
 
                 img_name, rel_path, alt_text, is_featured_str, order_str = [p.strip() for p in parts[:5]]
@@ -200,7 +216,7 @@ class ProductResource(resources.ModelResource):
                             ProductImage.objects.create(
                                 product=instance,
                                 image=File(f, name=filename),
-                                name=img_name if img_name != 'Unnamed' else None, 
+                                name=img_name if img_name != 'Unnamed' else None,
                                 alt_text=alt_text if alt_text != 'Unnamed' else None,
                                 is_featured=is_featured,
                                 order=order
@@ -212,16 +228,16 @@ class ProductResource(resources.ModelResource):
 
         variations_data_str = row_data.get('exported_variations', '')
         if variations_data_str and instance.product_type == Product.VARIABLE:
-            instance.variations.all().delete() 
+            instance.variations.all().delete()
             for variation_entry in variations_data_str.split('|'):
                 parts = variation_entry.split(':')
-                if len(parts) < 5: 
+                if len(parts) < 5:
                     continue
 
                 size, weight, color, price_str, stock_str = [p.strip() for p in parts[:5]]
 
                 price = float(price_str) if price_str else None
-                stock = int(stock_str) if stock_str.isdigit() else 0 
+                stock = int(stock_str) if stock_str.isdigit() else 0
 
                 try:
                     ProductVariation.objects.create(
@@ -242,37 +258,59 @@ class ProductResource(resources.ModelResource):
         import_id_fields = ('slug',)
         fields = (
             'name', 'slug', 'short_description', 'description',
-            'product_type', 'vendor', 'categories',
+            'product_type',
+            'vendor',
+            'categories',
             'regular_price', 'sale_price', 'stock_quantity',
             'is_active', 'is_featured', 'seo_title', 'meta_description',
             'created_at', 'updated_at',
-            'exported_images', 'exported_variations', 
-            'vendor_username', 'category_names' 
+            'exported_images', 'exported_variations',
         )
         export_order = (
             'name', 'slug', 'short_description', 'description',
-            'product_type', 'vendor_username', 'category_names',
+            'product_type',
+            'vendor',
+            'categories',
             'regular_price', 'sale_price', 'stock_quantity',
             'is_active', 'is_featured', 'seo_title', 'meta_description',
             'created_at', 'updated_at',
             'exported_images', 'exported_variations',
         )
         skip_unchanged = True
+        encoding = 'utf-8'
 
 
+class UTF8CSVFormat(CSV):
+    def get_encoding(self):
+        return 'utf-8'
+
+    def is_available(self):
+        return True
+    
 @admin.register(Product)
 class ProductAdmin(ImportExportModelAdmin):
     resource_class = ProductResource
     inlines = [ProductImageInline, ProductVariationInline]
+
     list_display = (
         'name_display', 'vendor_display', 'product_type', 'get_display_price',
         'stock_quantity_display', 'is_active', 'is_featured', 'created_at'
     )
-    list_filter = ('product_type', 'is_active', 'is_featured', 'vendor', 'categories')
-    search_fields = ('name', 'vendor__username', 'short_description', 'description') 
-    prepopulated_fields = {"slug": ("name",)}
+
+    list_filter = (
+        'product_type', 'is_active', 'is_featured', 'vendor', 'categories'
+    )
+
+    search_fields = (
+        'name', 'vendor__username', 'short_description', 'description'
+    )
+
     readonly_fields = ('created_at', 'updated_at')
-    filter_horizontal = ('categories',) 
+    filter_horizontal = ('categories',)
+
+    def get_import_formats(self):
+        formats = [CSV, XLSX]
+        return [f for f in formats if f().is_available()]
 
     def name_display(self, obj):
         return obj.name or "---"
@@ -285,7 +323,7 @@ class ProductAdmin(ImportExportModelAdmin):
     def stock_quantity_display(self, obj):
         if obj.product_type == Product.SIMPLE:
             return obj.stock_quantity if obj.stock_quantity is not None else "---"
-        else: 
+        else:
             total_stock = obj.variations.aggregate(Sum('stock'))['stock__sum']
             return total_stock if total_stock is not None else "---"
     stock_quantity_display.short_description = "Stock"
@@ -297,10 +335,10 @@ class ProductAdmin(ImportExportModelAdmin):
 
     fieldsets = (
         (None, {
-            'fields': ('name', 'slug', 'product_type', 'vendor', 'categories'),
+            'fields': ('name', 'product_type', 'vendor', 'categories'),
         }),
         ('Pricing & Inventory', {
-            'fields': ('regular_price', 'sale_price', 'stock_quantity'), 
+            'fields': ('regular_price', 'sale_price', 'stock_quantity'),
             'description': 'For "Simple" products, use "Stock Quantity". For "Variable" products, stock is managed per variation below.'
         }),
         ('Description', {
@@ -318,7 +356,7 @@ class ProductAdmin(ImportExportModelAdmin):
             'classes': ('collapse',),
         }),
     )
-
+    
 
 @admin.register(ProductVariation)
 class ProductVariationAdmin(ImportExportModelAdmin):
@@ -408,7 +446,7 @@ class CategoryAdmin(ImportExportModelAdmin):
     def view_on_site_link(self, obj):
         try:
             return format_html('<a href="{}" target="_blank">View on Site</a>', obj.get_absolute_url())
-        except Exception: 
+        except Exception:
             return "N/A"
     view_on_site_link.short_description = "Frontend URL"
 
@@ -422,3 +460,120 @@ class DeliveryChargeAdmin(admin.ModelAdmin):
         if obj:
             return ['zone']
         return super().get_readonly_fields(request, obj)
+
+
+# Inlines for the VendorProduct model
+class VendorProductImageInline(admin.StackedInline):
+    model = VendorProductImage
+    extra = 1
+
+class VendorProductVariationInline(admin.StackedInline):
+    model = VendorProductVariation
+    extra = 1
+
+class VendorProductResource(resources.ModelResource):
+    """
+    Resource class for VendorProduct to handle import/export.
+    """
+    class Meta:
+        model = VendorProduct
+        fields = ('id', 'vendor', 'name', 'short_description', 'description', 
+                  'product_type', 'regular_price', 'sale_price', 'vendor_price',
+                  'stock_quantity', 'is_active', 'is_featured', 'status',
+                  'seo_title', 'meta_description', 'created_at', 'updated_at')
+        export_order = ('id', 'name', 'vendor', 'status')
+
+
+@admin.register(VendorProduct)
+class VendorProductAdmin(ImportExportModelAdmin):
+    resource_class = VendorProductResource
+    list_display = ('name', 'vendor', 'status', 'created_at')
+    list_filter = ('status', 'vendor')
+    search_fields = ('name', 'vendor__username')
+    readonly_fields = ('created_at', 'updated_at')
+    filter_horizontal = ('categories',)
+    inlines = [VendorProductImageInline, VendorProductVariationInline]
+    actions = ['approve_products', 'reject_products']
+
+    fieldsets = (
+        (None, {
+            'fields': ('vendor', 'name', 'product_type', 'status', 'categories'),
+        }),
+        ('Descriptions', {
+            'fields': ('short_description', 'description'),
+        }),
+        ('Pricing & Inventory', {
+            'fields': ('regular_price', 'sale_price', 'vendor_price', 'stock_quantity'),
+        }),
+        ('Display & SEO', {
+            'fields': ('is_active', 'is_featured', 'seo_title', 'meta_description'),
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def approve_products(self, request, queryset):
+        approved_count = 0
+        for vendor_product in queryset.filter(status=VendorProduct.STATUS_PENDING):
+            try:
+                # Create a new Product instance with data from VendorProduct
+                product = Product.objects.create(
+                    vendor=vendor_product.vendor,
+                    name=vendor_product.name,
+                    short_description=vendor_product.short_description,
+                    description=vendor_product.description,
+                    product_type=vendor_product.product_type,
+                    regular_price=vendor_product.regular_price,
+                    sale_price=vendor_product.sale_price,
+                    stock_quantity=vendor_product.stock_quantity,
+                    is_active=vendor_product.is_active,
+                    is_featured=vendor_product.is_featured,
+                    seo_title=vendor_product.seo_title,
+                    meta_description=vendor_product.meta_description,
+                )
+                product.categories.set(vendor_product.categories.all())
+
+                # Copy images
+                for img in vendor_product.images.all():
+                    ProductImage.objects.create(
+                        product=product,
+                        image=img.image,
+                        name=img.name,
+                        alt_text=img.alt_text,
+                        is_featured=img.is_featured,
+                        order=img.order,
+                    )
+
+                # Copy variations
+                for var in vendor_product.variations.all():
+                    ProductVariation.objects.create(
+                        product=product,
+                        size=var.size,
+                        weight=var.weight,
+                        color=var.color,
+                        price=var.price,
+                        stock=var.stock,
+                    )
+
+                # Update the status of the vendor's product submission
+                vendor_product.status = VendorProduct.STATUS_APPROVED
+                vendor_product.save()
+                approved_count += 1
+            except Exception as e:
+                messages.error(request, f"Failed to approve '{vendor_product.name}': {str(e)}")
+
+        if approved_count > 0:
+            messages.success(request, f"{approved_count} product(s) approved and published successfully.")
+
+    approve_products.short_description = "Approve selected products"
+
+    def reject_products(self, request, queryset):
+        rejected_count = queryset.filter(status=VendorProduct.STATUS_PENDING).update(status=VendorProduct.STATUS_REJECTED)
+        if rejected_count > 0:
+            messages.warning(request, f"{rejected_count} product(s) rejected.")
+        else:
+            messages.info(request, "No pending products were selected for rejection.")
+
+    reject_products.short_description = "Reject selected products"

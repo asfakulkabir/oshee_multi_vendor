@@ -2,7 +2,7 @@ from collections import defaultdict
 from products.models import Category
 
 def mega_menu_categories(request):
-    parent_categories = Category.objects.filter(parent__isnull=True)
+    parent_categories = Category.objects.filter(parent__isnull=True)[:12]
     structured_mega_menu = {}
 
     for parent in parent_categories:

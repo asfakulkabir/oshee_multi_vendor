@@ -1,66 +1,121 @@
-# dashboard/forms.py
 from django import forms
-from products.models import Product, ProductImage, ProductVariation, Category # Import Category
+from django.forms import modelformset_factory
+from django.forms.widgets import ClearableFileInput
+from products.models import VendorProduct, VendorProductImage, VendorProductVariation
 
-class ProductForm(forms.ModelForm):
+# 1. Create a custom widget that supports multiple files
+class MultipleFileInput(forms.FileInput):
+    def __init__(self, attrs=None):
+        super().__init__(attrs)
+        # Ensure the 'multiple' attribute is always set
+        self.attrs['multiple'] = True
+
+# 2. Create a custom field that uses the custom widget
+class MultipleImageField(forms.ImageField):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('widget', MultipleFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        # The clean method needs to handle a list of files
+        single_file = False
+        if not data:
+            return None # No files uploaded
+        if not isinstance(data, list):
+            # This handles a single file upload gracefully
+            single_file = True
+            data = [data]
+
+        cleaned_data = []
+        for file in data:
+            cleaned_data.append(super().clean(file))
+        
+        # If it was a single file, return a single file
+        if single_file:
+            return cleaned_data[0]
+            
+        return cleaned_data
+
+class VendorProductForm(forms.ModelForm):
+    """A form for editing the main VendorProduct fields."""
     class Meta:
-        model = Product
-        # Remove 'slug' and 'created_at' as they are auto-generated.
-        # 'vendor' will likely be set in the view based on the logged-in user.
-        exclude = ['vendor', 'slug', 'created_at', 'updated_at']
+        model = VendorProduct
+        fields = [
+            'name', 'short_description', 'description', 'product_type', 'categories',
+            'regular_price', 'sale_price', 'stock_quantity', 'is_active', 'is_featured',
+            'seo_title', 'meta_description',
+        ]
+        widgets = {
+            'categories': forms.SelectMultiple(),
+            'description': forms.Textarea(attrs={'class': 'rich-text-editor'}),
+            'short_description': forms.Textarea(attrs={'rows': 3}),
+        }
 
-    # Use the Category model directly for the queryset
-    categories = forms.ModelMultipleChoiceField(
-        queryset=Category.objects.all(), # Corrected: use Category.objects.all()
-        widget=forms.CheckboxSelectMultiple,
+class VendorProductImageForm(forms.Form):
+    """A form for adding new images to a product."""
+    # 3. Use the new custom field here
+    images = MultipleImageField(
+        label='Add new images',
         required=False,
-        label="Categories" # Add a label for clarity
     )
 
-    # Add custom widgets for better user experience if desired
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Example: Add CSS classes to fields
-        self.fields['name'].widget.attrs.update({'class': 'form-control'})
-        self.fields['short_description'].widget.attrs.update({'class': 'form-control ckeditor'})
-        self.fields['description'].widget.attrs.update({'class': 'form-control ckeditor'})
-        self.fields['product_type'].widget.attrs.update({'class': 'form-select'})
-        self.fields['regular_price'].widget.attrs.update({'class': 'form-control'})
-        self.fields['sale_price'].widget.attrs.update({'class': 'form-control'})
-        self.fields['stock_quantity'].widget.attrs.update({'class': 'form-control'})
-        self.fields['sku'].widget.attrs.update({'class': 'form-control'})
-        self.fields['gtin'].widget.attrs.update({'class': 'form-control'})
-        self.fields['is_active'].widget.attrs.update({'class': 'form-check-input'})
-        self.fields['is_featured'].widget.attrs.update({'class': 'form-check-input'})
-        self.fields['seo_title'].widget.attrs.update({'class': 'form-control'})
-        self.fields['meta_description'].widget.attrs.update({'class': 'form-control'})
-
-
-class ProductImageForm(forms.ModelForm):
+class VendorProductVariationForm(forms.ModelForm):
+    """A form for a single product variation."""
     class Meta:
-        model = ProductImage
-        fields = ['image', 'name', 'alt_text', 'is_featured', 'order'] # Added more fields for better control
+        model = VendorProductVariation
+        fields = ['size', 'weight', 'color', 'price', 'stock']
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['image'].widget.attrs.update({'class': 'form-control'})
-        self.fields['name'].widget.attrs.update({'class': 'form-control'})
-        self.fields['alt_text'].widget.attrs.update({'class': 'form-control'})
-        self.fields['is_featured'].widget.attrs.update({'class': 'form-check-input'})
-        self.fields['order'].widget.attrs.update({'class': 'form-control'})
+VariationFormSet = modelformset_factory(
+    VendorProductVariation,
+    form=VendorProductVariationForm,
+    extra=1,
+    can_delete=True,
+)
 
+# edit profile 
+from accounts.models import VendorProfile
 
-class ProductVariationForm(forms.ModelForm):
-    # Removed attribute_values as it's no longer in the model
-    # Instead, use the direct fields 'size', 'weight', 'color'
+class VendorProfileForm(forms.ModelForm):
     class Meta:
-        model = ProductVariation
-        fields = ['size', 'weight', 'color', 'price', 'stock'] # Corrected fields
-
+        model = VendorProfile
+        fields = [
+            'company_name',
+            'contact_person_name',
+            'email',
+            'phone_number',
+            'address',
+            'business_type',
+            'website_url',
+            'tax_id',
+            'vendor_logo',
+            'nid',
+        ]
+        labels = {
+            'nid': 'NID/Passport Number',
+        }
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['size'].widget.attrs.update({'class': 'form-control'})
-        self.fields['weight'].widget.attrs.update({'class': 'form-control'})
-        self.fields['color'].widget.attrs.update({'class': 'form-control'})
-        self.fields['price'].widget.attrs.update({'class': 'form-control'})
-        self.fields['stock'].widget.attrs.update({'class': 'form-control'})
+        
+        # Define the common Tailwind classes for all input fields
+        tailwind_classes = "mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"
+        
+        # Loop through all fields and add the common classes
+        for name, field in self.fields.items():
+            if name != 'vendor_logo':
+                if name == 'address':
+                    field.widget.attrs.update({'class': f"{tailwind_classes} h-24"})
+                else:
+                    field.widget.attrs.update({'class': tailwind_classes})
+
+        # === FIX IS HERE ===
+        # Use 'readonly' instead of 'disabled' for the email and phone fields
+        # This will send the value on form submission
+        self.fields['email'].widget.attrs.update({
+            'readonly': 'readonly', 
+            'class': f"{tailwind_classes} bg-gray-100 cursor-not-allowed p-2"
+        })
+        self.fields['phone_number'].widget.attrs.update({
+            'readonly': 'readonly', 
+            'class': f"{tailwind_classes} bg-gray-100 cursor-not-allowed p-2"
+        })

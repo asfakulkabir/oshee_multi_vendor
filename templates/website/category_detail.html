@@ -43,7 +43,7 @@
                         </a>
                     </li>
                     {% for parent_category in categories %}
-                      <li>
+                      <li {% if forloop.counter0 >= 5 %}class="hidden-category"{% endif %}>
                         <div class="flex items-center justify-between">
                           <a href="{% url 'website:category_detail' full_slug=parent_category.get_full_slug %}"
                              class="block px-2 py-1 rounded w-full {% if category and category.id == parent_category.id %}bg-blue-50 text-rose-900{% else %}hover:bg-gray-100{% endif %}">
@@ -75,6 +75,11 @@
                       </li>
                       {% endfor %}
                 </ul>
+                {% if categories|length > 5 %}
+                <button id="viewAllCategoriesBtn" class="mt-2 w-full py-2 px-3 text-rose-800 cursor-pointer underline text-sm text-start">
+                    View All Categories
+                </button>
+                {% endif %}
             </div>
 
             <div class="filter-section">
@@ -198,7 +203,7 @@
                                 </a>
                             </li>
                               {% for parent_category in categories %}
-                              <li>
+                              <li  {% if forloop.counter0 >= 5 %}class="hidden-category"{% endif %}>
                                 <div class="flex items-center justify-between">
                          <a href="{% url 'website:category_detail' full_slug=parent_category.get_full_slug %}"
                             class="block px-2 py-1 rounded w-full {% if category and category.id == parent_category.id %}bg-blue-50 text-rose-900{% else %}hover:bg-gray-100{% endif %}">
@@ -230,6 +235,11 @@
                               </li>
                               {% endfor %}
                         </ul>
+                        {% if categories|length > 5 %}
+                        <button id="viewAllDesktopCategoriesBtn" class="mt-2 w-full py-2 px-3 text-rose-800 cursor-pointer underline text-sm text-start">
+                            View All Categories
+                        </button>
+                        {% endif %}
                     </div>
 
                     <div class="filter-section">
@@ -698,6 +708,31 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+
+    const viewAllCategoriesBtn = document.getElementById('viewAllCategoriesBtn');
+    const hiddenMobileCategories = document.querySelectorAll('#categoryList .hidden-category');
+
+    if (viewAllCategoriesBtn) {
+        viewAllCategoriesBtn.addEventListener('click', function() {
+            hiddenMobileCategories.forEach(category => {
+                category.classList.remove('hidden-category');
+            });
+            this.style.display = 'none';
+        });
+    }
+
+    const viewAllDesktopCategoriesBtn = document.getElementById('viewAllDesktopCategoriesBtn');
+    const hiddenDesktopCategories = document.querySelectorAll('#desktopCategoryList .hidden-category');
+
+    if (viewAllDesktopCategoriesBtn) {
+        viewAllDesktopCategoriesBtn.addEventListener('click', function() {
+            hiddenDesktopCategories.forEach(category => {
+                category.classList.remove('hidden-category');
+            });
+            this.style.display = 'none';
+        });
+    }
 
     // --- Client-Side Wishlist Logic ---
     function getWishlist() {

@@ -1,0 +1,24 @@
+{% extends "_base/_base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="container mx-auto px-6 pt-16 pb-32 flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-lg p-8 max-w-xl w-full text-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">{% translate "Confirm Deletion" %}</h1>
+        <p class="text-lg text-gray-600 mb-6">{% translate "Are you sure you want to delete the product application for:" %}</p>
+        <p class="text-xl font-semibold text-gray-900 mb-8">"{{ vendor_product.name }}"</p>
+        
+        <form method="post">
+            {% csrf_token %}
+            <div class="flex justify-center space-x-4">
+                <a href="{% url 'dashboard:vendor_dashboard' %}" class="px-6 py-3 bg-gray-300 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-400 transition duration-300">
+                    {% translate "Cancel" %}
+                </a>
+                <button type="submit" class="px-6 py-3 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition duration-300">
+                    {% translate "Delete" %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
