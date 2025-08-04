@@ -8,6 +8,7 @@ from ckeditor.fields import RichTextField
 from django.core.validators import MinValueValidator
 from django.utils.translation import gettext_lazy as _
 from django.urls import reverse
+from django.conf import settings  
 
 
 User = settings.AUTH_USER_MODEL
@@ -78,7 +79,7 @@ class Product(models.Model):
         (SIMPLE, 'Simple'),
         (VARIABLE, 'Variable'),
     ]
-    vendor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
+    vendor = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='products' )
 
     name = models.CharField(max_length=255, blank=True, null=True) 
     slug = AutoSlugField(populate_from='name', unique=True, slugify=custom_slugify, always_update=True)
@@ -226,7 +227,7 @@ class VendorProduct(models.Model):
         (STATUS_REJECTED, 'Rejected'),
     ]
 
-    vendor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='vendor_products')
+    vendor = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='vendor_products' )
     name = models.CharField(max_length=255, blank=True, null=True)
     slug = AutoSlugField(populate_from='name', unique=True, slugify=custom_slugify, always_update=True)
     short_description = RichTextField(blank=True, null=True)

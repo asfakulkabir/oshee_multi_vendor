@@ -412,26 +412,38 @@ def wishlist_products_api(request):
 def checkout_ecommerce(request):
     if request.method == 'POST':
         try:
-            # Get cart items from the POST request
             cart_items_json = request.POST.get('cart_items')
             if not cart_items_json:
                 return JsonResponse({'error': 'Cart items are missing'}, status=400)
 
-            # Parse the cart items JSON
             cart_items = json.loads(cart_items_json)
-
-            # Validate cart items
             if not isinstance(cart_items, list):
-                return JsonResponse({'error': 'Invalid cart items format'}, status=400)
+                cart_items = [cart_items]
 
-            # Calculate the total of all products
-            total_amount = 0
+            total_amount = Decimal('0.0')
+            cleaned_cart_items = []
+
             for item in cart_items:
-                if not isinstance(item, dict) or 'price' not in item or 'quantity' not in item:
-                    return JsonResponse({'error': 'Invalid item format in cart'}, status=400)
-                total_amount += item['price'] * item['quantity']
+                try:
+                    price = Decimal(str(item['price']))
+                    quantity = Decimal(str(item['quantity']))
+                    total_amount += price * quantity
 
-            # Get delivery zone and charge
+                    vendor_id = item.get('vendor_id')
+                    if not vendor_id:
+                        return JsonResponse({'error': f"Missing vendor_id for item: {item.get('name', 'Unknown')}"}, status=400)
+
+                    cleaned_cart_items.append({
+                        'name': item.get('name', ''),
+                        'image': item.get('image', ''),
+                        'price': float(price),
+                        'quantity': int(quantity),
+                        'variation': item.get('variation', {}),
+                        'vendor_id': str(vendor_id),
+                    })
+                except Exception as item_error:
+                    return JsonResponse({'error': f"Error processing item: {item_error}"}, status=400)
+
             delivery_zone = request.POST.get('delivery_zone')
             if not delivery_zone:
                 return JsonResponse({'error': 'Delivery zone is missing'}, status=400)
@@ -441,11 +453,10 @@ def checkout_ecommerce(request):
             except DeliveryCharge.DoesNotExist:
                 return JsonResponse({'error': 'Invalid delivery zone'}, status=400)
 
-            # Calculate grand total
             grand_total = total_amount + delivery_charge.charge
-            # Save the order
+
             order = Ecommercecheckouts.objects.create(
-                items_json=json.dumps(cart_items),
+                items_json=cleaned_cart_items,
                 customer_name=request.POST.get('customer_name', ''),
                 customer_phone=request.POST.get('customer_phone_number', ''),
                 customer_address=request.POST.get('customer_address', ''),
@@ -454,35 +465,27 @@ def checkout_ecommerce(request):
                 status='processing'
             )
 
-            # Clear the cart after successful order placement
-            if 'cart' in request.session:
-                del request.session['cart']
-
-            return redirect('/order_success/?orderid='+str(order.id))  # Redirect to a success page
+            return redirect('/order_success/?orderid=' + str(order.id))
 
         except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
 
-    # Get all delivery zones for the form
     delivery_zones = DeliveryCharge.objects.all()
-
     return render(request, 'website/checkout_ecommerce.html', {'delivery_zones': delivery_zones})
-
 
 def order_success(request):
     order_id = request.GET.get('orderid')
     if not order_id:
-        # Handle case where orderid is missing, maybe redirect to home or an error page
-        return redirect('/')
+        return redirect('/')  # Redirect if order ID missing
 
     order = get_object_or_404(Ecommercecheckouts, id=order_id)
-    items_json_data = json.loads(order.items_json)
 
     return render(request, 'website/order_success.html', {
         'orderid': order.id,
-        'items_json': items_json_data # Pass the parsed JSON directly
+        'items_json': order.items_json,  # Already a Python list/dict
+        'order': order,
     })
 
 

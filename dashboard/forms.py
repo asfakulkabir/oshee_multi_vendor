@@ -2,6 +2,8 @@ from django import forms
 from django.forms import modelformset_factory
 from django.forms.widgets import ClearableFileInput
 from products.models import VendorProduct, VendorProductImage, VendorProductVariation
+from accounts.models import CustomUser
+from orders.models import VendorOrder
 
 # 1. Create a custom widget that supports multiple files
 class MultipleFileInput(forms.FileInput):
@@ -42,7 +44,7 @@ class VendorProductForm(forms.ModelForm):
         model = VendorProduct
         fields = [
             'name', 'short_description', 'description', 'product_type', 'categories',
-            'regular_price', 'sale_price', 'stock_quantity', 'is_active', 'is_featured',
+            'regular_price', 'sale_price', 'stock_quantity',
             'seo_title', 'meta_description',
         ]
         widgets = {
@@ -73,11 +75,9 @@ VariationFormSet = modelformset_factory(
 )
 
 # edit profile 
-from accounts.models import VendorProfile
-
 class VendorProfileForm(forms.ModelForm):
     class Meta:
-        model = VendorProfile
+        model = CustomUser
         fields = [
             'company_name',
             'contact_person_name',
@@ -93,14 +93,12 @@ class VendorProfileForm(forms.ModelForm):
         labels = {
             'nid': 'NID/Passport Number',
         }
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
-        # Define the common Tailwind classes for all input fields
+
         tailwind_classes = "mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"
-        
-        # Loop through all fields and add the common classes
+
         for name, field in self.fields.items():
             if name != 'vendor_logo':
                 if name == 'address':
@@ -108,14 +106,25 @@ class VendorProfileForm(forms.ModelForm):
                 else:
                     field.widget.attrs.update({'class': tailwind_classes})
 
-        # === FIX IS HERE ===
-        # Use 'readonly' instead of 'disabled' for the email and phone fields
-        # This will send the value on form submission
         self.fields['email'].widget.attrs.update({
-            'readonly': 'readonly', 
-            'class': f"{tailwind_classes} bg-gray-100 cursor-not-allowed p-2"
+            'readonly': 'readonly',
+            'class': f"{tailwind_classes} bg-gray-100 cursor-not-allowed"
         })
         self.fields['phone_number'].widget.attrs.update({
-            'readonly': 'readonly', 
-            'class': f"{tailwind_classes} bg-gray-100 cursor-not-allowed p-2"
+            'readonly': 'readonly',
+            'class': f"{tailwind_classes} bg-gray-100 cursor-not-allowed"
         })
+
+
+class VendorOrderStatusForm(forms.ModelForm):
+    class Meta:
+        model = VendorOrder
+        fields = ['status']
+        widgets = {
+            'status': forms.Select(choices=[
+                ('processing', 'Processing'),
+                ('shipped', 'Shipped'),
+                ('delivered', 'Delivered'),
+                ('cancelled', 'Cancelled'),
+            ], attrs={'class': 'form-select'})
+        }

@@ -4,7 +4,7 @@
 {% block title %}Vendor Registration{% endblock %}
 
 {% block content %}
-<div class="min-h-screen flex items-center justify-center py-4 lg:py-12 px-4 sm:px-6 lg:px-8">
+<section aria-label="Vendor Registration Form" class="min-h-screen flex items-center justify-center py-4 lg:py-12 px-4 sm:px-6 lg:px-8">
     <div class="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-8 lg:p-12 border border-gray-100">
         <div class="text-center">
             <h2 class="text-xl md:text-2xl lg:text-3xl xl:text-4xl font-extrabold text-gray-900 tracking-tight">Become a Vendor</h2>
@@ -13,20 +13,22 @@
             </p>
         </div>
 
-        <form method="post" enctype="multipart/form-data" class="mt-12 space-y-8">
+        <form method="post" enctype="multipart/form-data" class="mt-12 space-y-8" novalidate>
             {% csrf_token %}
             {% for field in form %}
                 <div>
                     <label for="{{ field.id_for_label }}" class="block text-sm font-semibold text-gray-700">
                         {{ field.label }}
-                        {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+                        {% if field.field.required %}
+                            <span class="text-red-500 ml-1" aria-hidden="true">*</span>
+                        {% endif %}
                     </label>
-                    {{ field|add_class:"mt-1 block w-full px-4 py-3 rounded-md border-gray-300 shadow-sm focus:ring-rose-500 focus:border-rose-500 sm:text-base transition duration-150 ease-in-out" }}
+                    {{ field|add_class:"mt-1 block w-full px-4 py-3 rounded-md border border-gray-300 shadow-sm focus:ring-rose-500 focus:border-rose-500 sm:text-base transition duration-150 ease-in-out" }}
                     {% if field.help_text %}
                         <p class="text-xs text-gray-500 mt-2">{{ field.help_text }}</p>
                     {% endif %}
                     {% if field.errors %}
-                        <ul class="mt-2 text-sm text-red-600 list-disc list-inside">
+                        <ul class="mt-2 text-sm text-red-600 list-disc list-inside" role="alert" aria-live="assertive">
                             {% for error in field.errors %}
                                 <li>{{ error }}</li>
                             {% endfor %}
@@ -52,5 +54,5 @@
             </a>
         </p>
     </div>
-</div>
+</section>
 {% endblock %}

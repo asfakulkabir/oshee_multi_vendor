@@ -18,7 +18,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-
+AUTH_USER_MODEL = 'accounts.CustomUser'
 # Application definition
 
 INSTALLED_APPS = [
@@ -170,8 +170,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 #new for vendor profile
 AUTHENTICATION_BACKENDS = [
-    'accounts.backends.EmailOrPhoneNumberBackend', # Our custom backend
-    'django.contrib.auth.backends.ModelBackend',   # Django's default backend (keep it as a fallback)
+    'accounts.backends.VendorApprovedBackend',
+    'django.contrib.auth.backends.ModelBackend',  # fallback to default
 ]
 # Redirect URLs after login/logout
 LOGIN_REDIRECT_URL = '/' # Or wherever you want users to go after login

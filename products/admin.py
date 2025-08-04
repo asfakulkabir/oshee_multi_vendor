@@ -463,13 +463,23 @@ class DeliveryChargeAdmin(admin.ModelAdmin):
 
 
 # Inlines for the VendorProduct model
-class VendorProductImageInline(admin.StackedInline):
+class VendorProductImageInline(admin.TabularInline):
     model = VendorProductImage
     extra = 1
+    fields = ('image_preview', 'image', 'name', 'alt_text', 'is_featured', 'order')
+    readonly_fields = ('image_preview',)
 
-class VendorProductVariationInline(admin.StackedInline):
+    def image_preview(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="max-height: 60px;" />', obj.image.url)
+        return ""
+    image_preview.short_description = 'Preview'
+
+
+class VendorProductVariationInline(admin.TabularInline):
     model = VendorProductVariation
     extra = 1
+    fields = ('color', 'size', 'weight', 'price', 'stock')
 
 class VendorProductResource(resources.ModelResource):
     """
@@ -487,28 +497,37 @@ class VendorProductResource(resources.ModelResource):
 @admin.register(VendorProduct)
 class VendorProductAdmin(ImportExportModelAdmin):
     resource_class = VendorProductResource
-    list_display = ('name', 'vendor', 'status', 'created_at')
-    list_filter = ('status', 'vendor')
+    list_display = ('name', 'vendor', 'status_badge', 'created_at')
+    list_filter = ('status', 'vendor', 'is_active', 'is_featured', 'product_type')
     search_fields = ('name', 'vendor__username')
     readonly_fields = ('created_at', 'updated_at')
     filter_horizontal = ('categories',)
     inlines = [VendorProductImageInline, VendorProductVariationInline]
     actions = ['approve_products', 'reject_products']
 
+    def status_badge(self, obj):
+        color = {
+            'pending': '🔶',
+            'approved': '✅',
+            'rejected': '❌',
+        }.get(obj.status, '❓')
+        return f"{color} {obj.get_status_display()}"
+    status_badge.short_description = "Status"
+
     fieldsets = (
-        (None, {
+        ('🛍️ Basic Info', {
             'fields': ('vendor', 'name', 'product_type', 'status', 'categories'),
         }),
-        ('Descriptions', {
+        ('📝 Descriptions', {
             'fields': ('short_description', 'description'),
         }),
-        ('Pricing & Inventory', {
+        ('💲 Pricing & Inventory', {
             'fields': ('regular_price', 'sale_price', 'vendor_price', 'stock_quantity'),
         }),
-        ('Display & SEO', {
+        ('🎨 Display & SEO', {
             'fields': ('is_active', 'is_featured', 'seo_title', 'meta_description'),
         }),
-        ('Timestamps', {
+        ('📅 Timestamps (Read-only)', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',),
         }),
@@ -518,7 +537,6 @@ class VendorProductAdmin(ImportExportModelAdmin):
         approved_count = 0
         for vendor_product in queryset.filter(status=VendorProduct.STATUS_PENDING):
             try:
-                # Create a new Product instance with data from VendorProduct
                 product = Product.objects.create(
                     vendor=vendor_product.vendor,
                     name=vendor_product.name,
@@ -535,7 +553,6 @@ class VendorProductAdmin(ImportExportModelAdmin):
                 )
                 product.categories.set(vendor_product.categories.all())
 
-                # Copy images
                 for img in vendor_product.images.all():
                     ProductImage.objects.create(
                         product=product,
@@ -546,7 +563,6 @@ class VendorProductAdmin(ImportExportModelAdmin):
                         order=img.order,
                     )
 
-                # Copy variations
                 for var in vendor_product.variations.all():
                     ProductVariation.objects.create(
                         product=product,
@@ -557,23 +573,22 @@ class VendorProductAdmin(ImportExportModelAdmin):
                         stock=var.stock,
                     )
 
-                # Update the status of the vendor's product submission
                 vendor_product.status = VendorProduct.STATUS_APPROVED
                 vendor_product.save()
                 approved_count += 1
             except Exception as e:
-                messages.error(request, f"Failed to approve '{vendor_product.name}': {str(e)}")
+                self.message_user(request, f"Failed to approve '{vendor_product.name}': {str(e)}", level=messages.ERROR)
 
         if approved_count > 0:
-            messages.success(request, f"{approved_count} product(s) approved and published successfully.")
+            self.message_user(request, f"✅ {approved_count} product(s) approved and published successfully.", level=messages.SUCCESS)
 
-    approve_products.short_description = "Approve selected products"
+    approve_products.short_description = "✅ Approve selected products"
 
     def reject_products(self, request, queryset):
         rejected_count = queryset.filter(status=VendorProduct.STATUS_PENDING).update(status=VendorProduct.STATUS_REJECTED)
         if rejected_count > 0:
-            messages.warning(request, f"{rejected_count} product(s) rejected.")
+            self.message_user(request, f"❌ {rejected_count} product(s) rejected.", level=messages.WARNING)
         else:
-            messages.info(request, "No pending products were selected for rejection.")
+            self.message_user(request, "ℹ️ No pending products were selected for rejection.", level=messages.INFO)
 
-    reject_products.short_description = "Reject selected products"
+    reject_products.short_description = "❌ Reject selected products"

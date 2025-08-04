@@ -10,7 +10,7 @@
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
                 <div class="flex items-center space-x-4">
                     {% if profile.vendor_logo %}
-                        <img src="{{ profile.vendor_logo.url }}" alt="Vendor Logo" class="h-20 w-20 object-cover rounded-xl border-4 border-white/20 shadow-md">
+                        <img src="{{ profile.vendor_logo.url }}" alt="Vendor Logo" class="h-20 w-20 object-cover rounded-xl border-4 border-white/20 shadow-md bg-white">
                     {% else %}
                         <div class="h-20 w-20 bg-white/20 rounded-xl flex items-center justify-center text-white/70 text-sm text-center p-4 border-4 border-white/20 shadow-md">
                             No Logo
@@ -20,10 +20,10 @@
                         <h1 class="text-2xl md:text-3xl font-bold">{{ profile.company_name }}</h1>
                         <div class="flex items-center space-x-2 mt-1">
                             <span class="px-2 py-1 text-xs font-semibold rounded-full 
-                                {% if profile.status == 'approved' %} bg-green-100 text-green-800 
-                                {% elif profile.status == 'pending' %} bg-yellow-100 text-yellow-800 
+                                {% if profile.vendor_status == 'approved' %} bg-green-100 text-green-800 
+                                {% elif profile.vendor_status == 'pending approval' %} bg-yellow-100 text-yellow-800 
                                 {% else %} bg-red-100 text-red-800 {% endif %}">
-                                {{ profile.get_status_display }}
+                                {{ profile.vendor_status }}
                             </span>
                             {% if profile.business_type %}
                             <span class="px-2 py-1 text-xs font-semibold bg-white/20 rounded-full">

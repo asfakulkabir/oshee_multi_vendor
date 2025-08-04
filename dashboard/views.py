@@ -3,16 +3,17 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.forms import modelformset_factory
 from django.db import transaction
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Count, Q
 from .forms import VendorProductForm, VendorProductImageForm, VendorProductVariationForm, VariationFormSet
 from products.models import *
-from accounts.models import VendorProfile
+# from accounts.models import VendorProfile
 from .forms import VendorProfileForm
 import os
 import re 
 from decimal import Decimal
-from .forms import VendorProductForm, VendorProductImageForm, VariationFormSet  # New: import forms
+from .forms import VendorProductForm, VendorProductImageForm, VariationFormSet, VendorOrderStatusForm  # New: import forms
+from orders.models import VendorOrder  # New: import models for orders
 
 
 
@@ -349,41 +350,111 @@ def vendor_product(request, pk):
     }
     return render(request, 'dashboard/vendor_product.html', context)
 
-
 @login_required
 def vendor_profile_edit(request):
     """
     Allows a logged-in vendor to edit their profile.
     """
-    try:
-        vendor_profile = request.user.vendor_profile
-    except VendorProfile.DoesNotExist:
+    user = request.user
+
+    # Ensure the user is an approved vendor
+    if user.vendor_status != 'approved':
         messages.error(request, "You do not have a vendor profile to edit.")
-        return redirect('some_other_page') # Redirect to a safe page
+        return redirect('some_other_page')  # Change to a valid page name
 
     if request.method == 'POST':
-        form = VendorProfileForm(request.POST, request.FILES, instance=vendor_profile)
+        form = VendorProfileForm(request.POST, request.FILES, instance=user)
         if form.is_valid():
             form.save()
             messages.success(request, 'Your profile has been updated successfully!')
-            return redirect('dashboard:vendor_profile_view') # Redirect back to the same page
+            return redirect('dashboard:vendor_profile_view')
     else:
-        form = VendorProfileForm(instance=vendor_profile)
+        form = VendorProfileForm(instance=user)
 
     context = {
         'form': form,
     }
     return render(request, 'dashboard/vendor_profile_edit.html', context)
 
+
 @login_required
 def vendor_profile_view(request):
-    try:
-        vendor_profile = request.user.vendor_profile
-    except VendorProfile.DoesNotExist:
-        messages.error(request, "You do not have a vendor profile.")
-        return redirect('some_other_page')
-    
+    profile = request.user
+    # Check if the user is a vendor (you may have a field like is_vendor or vendor_status)
+    if not getattr(profile, 'is_vendor', False) and profile.vendor_status != 'approved':
+        messages.error(request, "You do not have vendor access or your vendor application is not approved.")
+        return redirect('some_other_page')  # Change to your preferred URL
+
     context = {
-        'profile': vendor_profile
+        'profile': profile,
     }
     return render(request, 'dashboard/vendor_profile_view.html', context)
+
+
+@login_required
+def vendor_my_orders(request):
+    vendor_orders_list = VendorOrder.objects.filter(vendor=request.user).order_by('-created_at')
+
+    # Define status choices statically
+    STATUS_CHOICES = [
+        ('processing', 'Processing'),
+        ('shipped', 'Shipped'),
+        ('delivered', 'Delivered'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    # --- Search and Filter Logic ---
+    search_query = request.GET.get('search', '')
+    status_filter = request.GET.get('status', '')
+
+    if search_query:
+        vendor_orders_list = vendor_orders_list.filter(
+            Q(id__icontains=search_query) |
+            Q(customer_name__icontains=search_query) |
+            Q(customer_phone__icontains=search_query)
+        )
+
+    if status_filter:
+        vendor_orders_list = vendor_orders_list.filter(status=status_filter)
+
+    # --- Pagination Logic ---
+    paginator = Paginator(vendor_orders_list, 10)
+    page_number = request.GET.get('page')
+    
+    try:
+        page_obj = paginator.get_page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.get_page(1)
+    except EmptyPage:
+        page_obj = paginator.get_page(paginator.num_pages)
+
+    for order in page_obj:
+        items_list = order.items_json
+        for item in items_list:
+            item['subtotal'] = item.get('quantity', 0) * item.get('price', 0)
+        order.items_json = items_list
+    
+    if request.method == 'POST':
+        order_id = request.POST.get('order_id')
+        order = get_object_or_404(VendorOrder, id=order_id, vendor=request.user)
+        
+        form = VendorOrderStatusForm(request.POST, instance=order)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Status for Order #{order.id} updated successfully.")
+        else:
+            messages.error(request, f"Failed to update status for Order #{order.id}.")
+        
+        return redirect('dashboard:vendor_my_orders')
+
+    forms_dict = {order.id: VendorOrderStatusForm(instance=order) for order in page_obj}
+
+    context = {
+        'page_obj': page_obj,
+        'forms_dict': forms_dict,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'status_choices': STATUS_CHOICES, # Using the static choices here
+    }
+    
+    return render(request, 'dashboard/vendor_my_orders.html', context)

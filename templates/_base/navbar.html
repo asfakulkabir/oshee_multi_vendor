@@ -57,7 +57,7 @@
           {% if user.is_authenticated %}
           <li class="border-b border-gray-300">
             <div class="flex flex-col px-4 py-2">
-              <span class="text-sm font-medium text-gray-900">{{ user.get_full_name }}</span>
+              <span class="text-sm font-medium text-gray-900">{{ user.contact_person_name }}</span>
               <p class="text-xs text-gray-700">{{ user.email }}</p>
             </div>
           </li>
@@ -233,7 +233,7 @@
           <img src="https://penguinui.s3.amazonaws.com/component-assets/avatar-8.webp" alt="User Profile"
             class="h-12 w-12 rounded-full object-cover" />
           <div>
-            <span class="font-medium text-gray-900">{{ user.get_full_name }}</span>
+            <span class="font-medium text-gray-900">{{ user.contact_person_name }}</span>
             <p class="text-sm text-gray-700">{{ user.email }}</p>
           </div>
           {% else %}

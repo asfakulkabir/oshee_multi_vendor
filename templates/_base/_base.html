@@ -112,6 +112,7 @@
 
     const productName = '{{ product.name }}'
     const product_imageurl ='{{ product.images.first.image.url }}';
+    const vendorId = '{{ product.vendor.id }}';  // <-- Add this line
     const cart = JSON.parse(localStorage.getItem('cart')) || [];
 
     function getCurrentDisplayedPrice() {
@@ -186,6 +187,7 @@
             price: getCurrentDisplayedPrice(),
             quantity: quantity,
             variation: selectedVariation,
+            vendor_id: vendorId,  // <-- Store vendor_id
         };
 
         addToCart(product);
