@@ -3,7 +3,7 @@
 {% block content %}
 
 <!-- Featured Categories -->
-<section class="py-4 hidden xl:block">
+<section class="py-2 hidden xl:block">
   <div class="mx-auto px-4">
     <div class="flex flex-row justify-center items-center gap-3 lg:gap-6 2xl:gap-12">
       {% for category in categories %}
@@ -21,10 +21,10 @@
   </div>
 </section>
  <!-- category slider mobile  -->
-<section class="py-4 block xl:hidden">
+<section class="py-2 block xl:hidden">
   <div class="container mx-auto px-4">
     <!-- Swiper -->
-    <div class="swiper categorySwiper">
+    <div class="swiper categorySwiper flex justify-center">
       <div class="swiper-wrapper">
         {% for category in categories %}
         <div class="swiper-slide text-center">
@@ -49,7 +49,7 @@
 <!-- Hero Banner -->
 <!-- DESKTOP BANNER SLIDER -->
 <div class="hidden md:block">
-  <div class="swiper desktopSwiper w-full h-[600px] xl:h-[700px]">
+  <div class="swiper desktopSwiper w-full h-[500px] xl:h-[700px]">
     <div class="swiper-wrapper">
       {% for banner in desktop_banners %}
       <div class="swiper-slide relative">

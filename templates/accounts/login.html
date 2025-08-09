@@ -1,5 +1,6 @@
 {% extends "_base/_base.html" %}
 {% load custom_filters %} 
+
 {% block title %}Login{% endblock %}
 
 {% block content %}
@@ -14,25 +15,54 @@
             </p>
         </div>
 
-
-
         <form class="mt-8 space-y-6" method="post">
             {% csrf_token %}
 
             {% for field in form %}
-                <div>
-                    <label for="{{ field.id_for_label }}" class="block text-sm font-semibold text-gray-700">
-                        {{ field.label }}
-                    </label>
-                    {{ field|add_class:"mt-1 block w-full px-4 py-3 rounded-md border border-gray-400 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-base transition duration-150 ease-in-out" }}
-                    {% if field.errors %}
-                        <ul class="text-red-600 text-xs mt-1 list-disc list-inside">
-                            {% for error in field.errors %}
-                                <li>{{ error }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-                </div>
+                {% if field.label == "Password" %}
+                    <div>
+                        <label for="{{ field.id_for_label }}" class="block text-sm font-semibold text-gray-700">
+                            {{ field.label }}
+                        </label>
+                        <div class="relative mt-1">
+                            {{ field|add_class:"block w-full px-4 py-3 rounded-md border border-gray-400 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-base transition duration-150 ease-in-out pr-12" }}
+                            <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5">
+                                <button type="button" id="togglePassword" class="text-gray-500 hover:text-gray-700 focus:outline-none">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path id="eye-open" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path id="eye-closed" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                </button>
+                            </span>
+                        </div>
+                        <div class="text-sm text-right mt-2">
+                            <a href="{% url 'accounts:password_reset' %}" class="font-medium text-indigo-600 hover:text-indigo-500 hover:underline">
+                                Forgot password?
+                            </a>
+                        </div>
+                        {% if field.errors %}
+                            <ul class="text-red-600 text-xs mt-1 list-disc list-inside">
+                                {% for error in field.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div>
+                        <label for="{{ field.id_for_label }}" class="block text-sm font-semibold text-gray-700">
+                            {{ field.label }}
+                        </label>
+                        {{ field|add_class:"mt-1 block w-full px-4 py-3 rounded-md border border-gray-400 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-base transition duration-150 ease-in-out" }}
+                        {% if field.errors %}
+                            <ul class="text-red-600 text-xs mt-1 list-disc list-inside">
+                                {% for error in field.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                {% endif %}
             {% endfor %}
 
             <div>
@@ -50,4 +80,26 @@
         </p>
     </div>
 </div>
+
+<script>
+    const togglePassword = document.querySelector('#togglePassword');
+    const password = document.querySelector('#id_password'); // Assuming default ID
+
+    togglePassword.addEventListener('click', function (e) {
+        // toggle the type attribute
+        const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+        password.setAttribute('type', type);
+        // toggle the eye icon
+        const eyeOpen = this.querySelector('#eye-open');
+        const eyeClosed = this.querySelector('#eye-closed');
+        if (type === 'text') {
+            eyeOpen.style.display = 'none';
+            eyeClosed.style.display = 'block';
+        } else {
+            eyeOpen.style.display = 'block';
+            eyeClosed.style.display = 'none';
+        }
+    });
+</script>
+
 {% endblock %}

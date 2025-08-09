@@ -15,4 +15,6 @@ urlpatterns = [
     path('profile/', views.vendor_profile_view, name='vendor_profile_view'),
     path('profile/edit/', views.vendor_profile_edit, name='vendor_profile_edit'),
     path('my-orders/', views.vendor_my_orders, name='vendor_my_orders'),
+    path('financial-summary/', views.vendor_financial_summary_view, name='vendor_financial_summary_view'),
+    path('financial-summary/download/', views.vendor_download_transactions_view, name='vendor_download_transactions'),
 ]

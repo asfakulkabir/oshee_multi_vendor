@@ -5,7 +5,7 @@ from django.utils.text import slugify
 from autoslug import AutoSlugField
 from unidecode import unidecode
 from ckeditor.fields import RichTextField
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils.translation import gettext_lazy as _
 from django.urls import reverse
 from django.conf import settings  
@@ -140,6 +140,10 @@ class Product(models.Model):
             return self.regular_price
         return None
 
+    @property
+    def prefixed_id(self):
+        return f"p-{self.id}"
+    
     def __str__(self):
         return self.name or f"Product (ID: {self.id})"
 
@@ -238,6 +242,7 @@ class VendorProduct(models.Model):
     regular_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.0)], blank=True, null=True)
     sale_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0.0)])
     vendor_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0.0)])
+    admin_commission = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, validators=[MinValueValidator(0.00), MaxValueValidator(100.00)])
 
     stock_quantity = models.PositiveIntegerField(default=0, blank=True, null=True)
 
@@ -295,6 +300,10 @@ class VendorProduct(models.Model):
             return self.regular_price
         return None
 
+    @property
+    def prefixed_id(self):
+        return f"v-{self.id}"
+    
     def __str__(self):
         return self.name or f"Product (ID: {self.id})"
 
@@ -347,6 +356,7 @@ class VendorProductImage(models.Model):
             self.name = unique_name
         
         super().save(*args, **kwargs)
+
 
     def __str__(self):
         return f"{self.product.name if self.product else 'No Product'} - {self.name or self.image.name.split('/')[-1] if self.image else 'No Name'}"

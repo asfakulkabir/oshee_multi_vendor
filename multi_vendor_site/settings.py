@@ -112,7 +112,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Dhaka'
 
 USE_I18N = True
 
@@ -177,3 +177,17 @@ AUTHENTICATION_BACKENDS = [
 LOGIN_REDIRECT_URL = '/' # Or wherever you want users to go after login
 LOGOUT_REDIRECT_URL = '/login/' # Or your login page
 LOGIN_URL = '/login/' # URL for login page (used by @login_required decorator)
+
+# your_project/settings.py
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# email 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'asfakulthoha@gmail.com'
+EMAIL_HOST_PASSWORD = 'xyrccmtldkazvuik'
+DEFAULT_FROM_EMAIL = 'asfakulthoha@gmail.com'
+EMAIL_USE_SSL = False
+APPEND_SLASH=True
+

@@ -2,6 +2,12 @@ from django import forms
 from .models import CustomUser
 from django.utils import timezone
 from django.utils.crypto import get_random_string
+from django.contrib.auth.forms import PasswordResetForm
+from django.core.exceptions import ValidationError
+from django.contrib.auth import get_user_model
+
+CustomUser = get_user_model()
+
 
 class VendorRegistrationForm(forms.ModelForm):
     company_name = forms.CharField(required=True)
@@ -46,7 +52,25 @@ class VendorRegistrationForm(forms.ModelForm):
             user.save()
         return user
 
-
 class LoginForm(forms.Form):
     username = forms.CharField(label="Email or Username", max_length=150)
-    password = forms.CharField(widget=forms.PasswordInput)
+    password = forms.CharField(
+        label="Password",
+        widget=forms.PasswordInput(attrs={'class': 'password-field', 'placeholder': 'Enter your password'})
+    )
+
+class CustomPasswordResetForm(PasswordResetForm):
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if not CustomUser.objects.filter(email=email).exists():
+            raise forms.ValidationError("You are not a registered user.")
+        return email
+
+    class Meta:
+        fields = ['email']
+        widgets = {
+            'email': forms.EmailInput(attrs={
+                'class': 'block w-full px-4 py-3 rounded-md border border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-base transition duration-150 ease-in-out',
+                'placeholder': 'Enter your email address'
+            })
+        }

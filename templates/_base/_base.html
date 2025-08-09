@@ -110,7 +110,8 @@
     let quantity = 1;
     let selectedVariation = {};
 
-    const productName = '{{ product.name }}'
+    const productName = '{{ product.name }}';
+    const productID = '{{ product.id }}';
     const product_imageurl ='{{ product.images.first.image.url }}';
     const vendorId = '{{ product.vendor.id }}';  // <-- Add this line
     const cart = JSON.parse(localStorage.getItem('cart')) || [];
@@ -182,6 +183,7 @@
 
     addToCartButton.addEventListener('click', () => {
         const product = {
+            product_id: productID,
             name: productName,
             image : product_imageurl,
             price: getCurrentDisplayedPrice(),
@@ -196,11 +198,13 @@
 
     buyNowButton.addEventListener('click', () => {
         const product = {
+            product_id: productID,
             name: productName,
             image : product_imageurl,
             price: getCurrentDisplayedPrice(),
             quantity: quantity,
             variation: selectedVariation,
+            vendor_id: vendorId,  // <-- Store vendor_id
         };
 
         clearCart();

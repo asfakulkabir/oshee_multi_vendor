@@ -1,6 +1,7 @@
 {% extends "_base/_base.html" %}
 {% load static %}
 
+{% block title %}Edit Product: {{ product.name }}{% endblock %}
 {% block content %}
 <div class="container mx-auto max-w-4xl py-12 px-4">
     <div class="bg-white shadow-xl rounded-lg p-8">
@@ -9,59 +10,131 @@
         <form method="POST" enctype="multipart/form-data" id="edit-product-form">
             {% csrf_token %}
 
-            <div class="mb-8">
-                <h3 class="text-xl font-semibold text-gray-700 mb-4">Product Details</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div class="md:col-span-2">
-                        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
-                        <input type="text" id="name" name="name" value="{{ product.name }}" placeholder="Product Name" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3" required>
-                    </div>
-                    <div class="md:col-span-2">
-                        <label for="short_description" class="block text-sm font-medium text-gray-700 mb-1">Short Description</label>
-                        <textarea id="short_description" name="short_description" placeholder="A brief, engaging summary of the product" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">{{ product.short_description }}</textarea>
-                    </div>
-                    <div class="md:col-span-2">
-                        <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Full Description</label>
-                        <textarea id="description" name="description" placeholder="A detailed description with key features and benefits" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 h-32">{{ product.description }}</textarea>
-                    </div>
-                    <div>
-                        <label for="regular_price" class="block text-sm font-medium text-gray-700 mb-1">Regular Price</label>
-                        <input type="number" step="0.01" id="regular_price" name="regular_price" value="{{ product.regular_price }}" placeholder="e.g., 99.99" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
-                    </div>
-                    <div>
-                        <label for="sale_price" class="block text-sm font-medium text-gray-700 mb-1">Sale Price</label>
-                        <input type="number" step="0.01" id="sale_price" name="sale_price" value="{{ product.sale_price }}" placeholder="e.g., 79.99" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
-                    </div>
-                    <div>
-                        <label for="vendor_price" class="block text-sm font-medium text-gray-700 mb-1">Vendor Price</label>
-                        <input type="number" step="0.01" id="vendor_price" name="vendor_price" value="{{ product.vendor_price }}" placeholder="e.g., 50.00" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
-                    </div>
-                    <div>
-                        <label for="stock_quantity" class="block text-sm font-medium text-gray-700 mb-1">Stock Quantity</label>
-                        <input type="number" id="stock_quantity" name="stock_quantity" value="{{ product.stock_quantity }}" placeholder="Number in stock" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
-                    </div>
-                </div>
+            <div class="mb-8" x-data="{
+    regularPrice: parseFloat('{{ product.regular_price|default:"0" }}'),
+    salePrice: parseFloat('{{ product.sale_price|default:"0" }}'),
+    vendorPrice: parseFloat('{{ product.vendor_price|default:"0" }}'),
+    adminCommission: parseFloat('{{ product.admin_commission|default:"0" }}'),
+    useSalePrice: '{{ product.sale_price|default:"" }}' !== '',
+    useVendorPrice: '{{ product.admin_commission|default:"" }}' === '' || parseFloat('{{ product.admin_commission|default:"0" }}') === 0,
+    useAdminCommission: parseFloat('{{ product.admin_commission|default:"0" }}') > 0,
+    salePriceError: false,
+    adminCommissionError: false,
 
-                <div class="mb-6">
-                    <label for="product_type" class="block text-sm font-medium text-gray-700 mb-1">Product Type</label>
-                    <select id="product_type" name="product_type" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
-                        {% for key, label in product_types %}
-                        <option value="{{ key }}" {% if product.product_type == key %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+    get mainPrice() {
+        return this.useSalePrice && this.salePrice > 0 ? this.salePrice : this.regularPrice;
+    },
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Categories</label>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                        {% for category in categories %}
-                        <label class="inline-flex items-center">
-                            <input type="checkbox" name="categories" value="{{ category.id }}" {% if category in product.categories.all %}checked{% endif %} class="form-checkbox h-4 w-4 text-blue-600 rounded-md">
-                            <span class="ml-2 text-sm text-gray-700">{{ category.name }}</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
+    get calculatedVendorPrice() {
+        if (this.useAdminCommission) {
+            let commissionAmount = this.mainPrice * (this.adminCommission / 100);
+            return (this.mainPrice - commissionAmount).toFixed(2);
+        }
+        return this.vendorPrice;
+    },
+    
+    get calculatedAdminCommission() {
+        if (this.useVendorPrice && this.mainPrice > 0) {
+            let commissionAmount = this.mainPrice - this.vendorPrice;
+            let commissionPercentage = (commissionAmount / this.mainPrice) * 100;
+            return commissionPercentage.toFixed(2);
+        }
+        return this.adminCommission;
+    }
+}" x-init="$watch('salePrice', value => {
+    if (useSalePrice && value >= regularPrice && value > 0) {
+        salePriceError = true;
+    } else {
+        salePriceError = false;
+    }
+}); 
+$watch('regularPrice', value => {
+    if (useSalePrice && salePrice >= value) {
+        salePriceError = true;
+    } else {
+        salePriceError = false;
+    }
+});
+$watch('adminCommission', value => {
+    if (value > 90) {
+        adminCommissionError = true;
+    } else {
+        adminCommissionError = false;
+    }
+});">
+    <h3 class="text-xl font-semibold text-gray-700 mb-4">Product Details</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="md:col-span-2">
+            <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+            <input type="text" id="name" name="name" value="{{ product.name }}" placeholder="Product Name" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3" required>
+        </div>
+        <div class="md:col-span-2">
+            <label for="short_description" class="block text-sm font-medium text-gray-700 mb-1">Short Description</label>
+            <textarea id="short_description" name="short_description" placeholder="A brief, engaging summary of the product" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">{{ product.short_description }}</textarea>
+        </div>
+        <div class="md:col-span-2">
+            <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Full Description</label>
+            <textarea id="description" name="description" placeholder="A detailed description with key features and benefits" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 h-32">{{ product.description }}</textarea>
+        </div>
+
+        <div>
+            <label for="regular_price" class="block text-sm font-medium text-gray-700 mb-1">Regular Price</label>
+            <input type="number" step="0.01" id="regular_price" name="regular_price" x-model.number="regularPrice" placeholder="e.g., 99.99" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
+        </div>
+
+        <div>
+            <div class="flex items-center space-x-2 mb-1">
+                <input type="checkbox" id="sale_price_checkbox" x-model="useSalePrice" class="form-checkbox h-4 w-4 text-blue-600 rounded-md">
+                <label for="sale_price_checkbox" class="text-sm font-medium text-gray-700">Sale Price</label>
+            </div>
+            <input type="number" step="0.01" id="sale_price" name="sale_price" x-bind:disabled="!useSalePrice" x-bind:value="useSalePrice ? salePrice : ''" x-model.number="salePrice" placeholder="e.g., 79.99" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 disabled:bg-gray-100 disabled:text-gray-500" x-bind:class="{ 'border-red-500': salePriceError }">
+            <p x-show="salePriceError" class="mt-1 text-sm text-red-600">Sale price must be less than regular price.</p>
+        </div>
+
+        <div>
+            <div class="flex items-center space-x-2 mb-1">
+                <input type="checkbox" id="vendor_price_checkbox" name="vendor_price_checkbox" x-model="useVendorPrice" @change="useAdminCommission = false" class="form-checkbox h-4 w-4 text-blue-600 rounded-md">
+                <label for="vendor_price_checkbox" class="text-sm font-medium text-gray-700">Vendor Price</label>
+            </div>
+            <input type="number" step="0.01" id="vendor_price" x-bind:disabled="!useVendorPrice" x-bind:value="useVendorPrice ? vendorPrice : calculatedVendorPrice" x-model.number="vendorPrice" placeholder="e.g., 50.00" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 disabled:bg-gray-100 disabled:text-gray-500">
+            <input type="hidden" name="vendor_price" x-bind:value="useVendorPrice ? vendorPrice : calculatedVendorPrice">
+        </div>
+
+        <div>
+            <div class="flex items-center space-x-2 mb-1">
+                <input type="checkbox" id="admin_commission_checkbox" name="admin_commission_checkbox" x-model="useAdminCommission" @change="useVendorPrice = false" class="form-checkbox h-4 w-4 text-blue-600 rounded-md">
+                <label for="admin_commission_checkbox" class="text-sm font-medium text-gray-700">Admin Commission (%)</label>
+            </div>
+            <input type="number" step="0.01" id="admin_commission" x-bind:disabled="!useAdminCommission" x-bind:value="useAdminCommission ? adminCommission : calculatedAdminCommission" x-model.number="adminCommission" placeholder="e.g., 10.00" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 disabled:bg-gray-100 disabled:text-gray-500" x-bind:class="{ 'border-red-500': adminCommissionError }">
+            <p x-show="adminCommissionError" class="mt-1 text-sm text-red-600">Admin commission cannot be greater than 90%.</p>
+            <input type="hidden" name="admin_commission" x-bind:value="useAdminCommission ? adminCommission : calculatedAdminCommission">
+        </div>
+
+        <div>
+            <label for="stock_quantity" class="block text-sm font-medium text-gray-700 mb-1">Stock Quantity</label>
+            <input type="number" id="stock_quantity" name="stock_quantity" value="{{ product.stock_quantity }}" placeholder="Number in stock" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
+        </div>
+        <div>
+        <label for="product_type" class="block text-sm font-medium text-gray-700 mb-1">Product Type</label>
+        <select id="product_type" name="product_type" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
+            {% for key, label in product_types %}
+            <option value="{{ key }}" {% if product.product_type == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        </div>
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Categories</label>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            {% for category in categories %}
+            <label class="inline-flex items-center">
+                <input type="checkbox" name="categories" value="{{ category.id }}" {% if category in product.categories.all %}checked{% endif %} class="form-checkbox h-4 w-4 text-blue-600 rounded-md">
+                <span class="ml-2 text-sm text-gray-700">{{ category.name }}</span>
+            </label>
+            {% endfor %}
+        </div>
+    </div>
             </div>
 
             <hr class="border-gray-200 my-8">

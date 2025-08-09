@@ -493,17 +493,20 @@ class VendorProductResource(resources.ModelResource):
                   'seo_title', 'meta_description', 'created_at', 'updated_at')
         export_order = ('id', 'name', 'vendor', 'status')
 
-
 @admin.register(VendorProduct)
 class VendorProductAdmin(ImportExportModelAdmin):
     resource_class = VendorProductResource
-    list_display = ('name', 'vendor', 'status_badge', 'created_at')
-    list_filter = ('status', 'vendor', 'is_active', 'is_featured', 'product_type')
-    search_fields = ('name', 'vendor__username')
+    list_display = ('name', 'vendor_company_name', 'status_badge', 'created_at')
+    list_filter = ('status', 'vendor__company_name', 'is_active', 'is_featured', 'product_type')
+    search_fields = ('name', 'vendor__company_name')
     readonly_fields = ('created_at', 'updated_at')
     filter_horizontal = ('categories',)
     inlines = [VendorProductImageInline, VendorProductVariationInline]
     actions = ['approve_products', 'reject_products']
+
+    def vendor_company_name(self, obj):
+        return obj.vendor.company_name if obj.vendor else "-"
+    vendor_company_name.short_description = "Vendor"
 
     def status_badge(self, obj):
         color = {
@@ -522,7 +525,7 @@ class VendorProductAdmin(ImportExportModelAdmin):
             'fields': ('short_description', 'description'),
         }),
         ('💲 Pricing & Inventory', {
-            'fields': ('regular_price', 'sale_price', 'vendor_price', 'stock_quantity'),
+            'fields': ('regular_price', 'sale_price', 'vendor_price', 'admin_commission', 'stock_quantity'),
         }),
         ('🎨 Display & SEO', {
             'fields': ('is_active', 'is_featured', 'seo_title', 'meta_description'),
@@ -534,61 +537,19 @@ class VendorProductAdmin(ImportExportModelAdmin):
     )
 
     def approve_products(self, request, queryset):
-        approved_count = 0
-        for vendor_product in queryset.filter(status=VendorProduct.STATUS_PENDING):
-            try:
-                product = Product.objects.create(
-                    vendor=vendor_product.vendor,
-                    name=vendor_product.name,
-                    short_description=vendor_product.short_description,
-                    description=vendor_product.description,
-                    product_type=vendor_product.product_type,
-                    regular_price=vendor_product.regular_price,
-                    sale_price=vendor_product.sale_price,
-                    stock_quantity=vendor_product.stock_quantity,
-                    is_active=vendor_product.is_active,
-                    is_featured=vendor_product.is_featured,
-                    seo_title=vendor_product.seo_title,
-                    meta_description=vendor_product.meta_description,
-                )
-                product.categories.set(vendor_product.categories.all())
-
-                for img in vendor_product.images.all():
-                    ProductImage.objects.create(
-                        product=product,
-                        image=img.image,
-                        name=img.name,
-                        alt_text=img.alt_text,
-                        is_featured=img.is_featured,
-                        order=img.order,
-                    )
-
-                for var in vendor_product.variations.all():
-                    ProductVariation.objects.create(
-                        product=product,
-                        size=var.size,
-                        weight=var.weight,
-                        color=var.color,
-                        price=var.price,
-                        stock=var.stock,
-                    )
-
-                vendor_product.status = VendorProduct.STATUS_APPROVED
-                vendor_product.save()
-                approved_count += 1
-            except Exception as e:
-                self.message_user(request, f"Failed to approve '{vendor_product.name}': {str(e)}", level=messages.ERROR)
-
+        """Mark selected vendor products as approved without creating Product objects."""
+        approved_count = queryset.filter(status=VendorProduct.STATUS_PENDING).update(status=VendorProduct.STATUS_APPROVED)
         if approved_count > 0:
-            self.message_user(request, f"✅ {approved_count} product(s) approved and published successfully.", level=messages.SUCCESS)
-
+            self.message_user(request, f"✅ {approved_count} product(s) approved successfully.", level=messages.SUCCESS)
+        else:
+            self.message_user(request, "ℹ️ No pending products were selected for approval.", level=messages.INFO)
     approve_products.short_description = "✅ Approve selected products"
 
     def reject_products(self, request, queryset):
+        """Mark selected vendor products as rejected."""
         rejected_count = queryset.filter(status=VendorProduct.STATUS_PENDING).update(status=VendorProduct.STATUS_REJECTED)
         if rejected_count > 0:
             self.message_user(request, f"❌ {rejected_count} product(s) rejected.", level=messages.WARNING)
         else:
             self.message_user(request, "ℹ️ No pending products were selected for rejection.", level=messages.INFO)
-
     reject_products.short_description = "❌ Reject selected products"

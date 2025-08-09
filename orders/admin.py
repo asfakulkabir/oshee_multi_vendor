@@ -7,7 +7,7 @@ from import_export.admin import ImportExportModelAdmin
 from django.core.exceptions import ObjectDoesNotExist
 import json
 
-from .models import Ecommercecheckouts, VendorOrder
+from .models import Ecommercecheckouts, VendorOrder, VendorFinancialSummary, VendorFinancialTransaction
 from products.models import DeliveryCharge
 from accounts.models import CustomUser
 from django.contrib.auth import get_user_model
@@ -215,11 +215,23 @@ class EcommercecheckoutsAdmin(ImportExportModelAdmin):
         table_html += "</tbody></table>"
         return format_html(table_html)
 
-        
 @admin.register(VendorOrder)
 class VendorOrderAdmin(admin.ModelAdmin):
-    list_display = ['id', 'vendor', 'ecommerce_checkout', 'total_price', 'status', 'created_at', 'summary']
+    list_display = [
+        'id',
+        'vendor_company_name',
+        'ecommerce_checkout',
+        'delivery_charge',
+        'total_price',
+        'status',
+        'created_at',
+        'summary'
+    ]
     readonly_fields = ['created_at', 'view_items_table']
+
+    def vendor_company_name(self, obj):
+        return obj.vendor.company_name if obj.vendor else "-"
+    vendor_company_name.short_description = "Vendor"
 
     def summary(self, obj):
         items = obj.items_json
@@ -270,3 +282,93 @@ class VendorOrderAdmin(admin.ModelAdmin):
         return format_html(table_html)
 
     view_items_table.short_description = "Item Breakdown"
+
+# vendor financial statement 
+# --- Resources for Export ---
+
+class VendorFinancialSummaryResource(resources.ModelResource):
+    class Meta:
+        model = VendorFinancialSummary
+        # Use the vendor's company name field and a date field.
+        # Assuming your User model has a field named 'vendor_companyname'.
+        fields = ('id', 'vendor__company_name', 'total_revenue', 'total_vendor_amount', 'total_admin_amount')
+        export_order = ('id', 'vendor__company_name', 'total_revenue', 'total_vendor_amount', 'total_admin_amount')
+
+class VendorFinancialTransactionResource(resources.ModelResource):
+    class Meta:
+        model = VendorFinancialTransaction
+        # Use the vendor's company name field and the transaction date.
+        fields = ('id', 'vendor__company_name', 'transaction_date', 'order__id', 'order_price', 'vendor_amount', 'admin_amount')
+        export_order = ('id', 'vendor__company_name', 'transaction_date', 'order__id', 'order_price', 'vendor_amount', 'admin_amount')
+
+# --- Admin Classes with Export ---
+class VendorFinancialTransactionInline(admin.TabularInline):
+    model = VendorFinancialTransaction
+    extra = 0
+    readonly_fields = (
+        'order',
+        'transaction_date',
+        'order_price',
+        'vendor_amount',
+        'admin_amount',
+    )
+    can_delete = False
+    
+    def has_add_permission(self, request, obj=None):
+        return False
+
+@admin.register(VendorFinancialSummary)
+class VendorFinancialSummaryAdmin(ImportExportModelAdmin, admin.ModelAdmin):
+    resource_class = VendorFinancialSummaryResource
+    list_display = (
+        'vendor_company_name',
+        'total_revenue',
+        'total_vendor_amount',
+        'total_admin_amount',
+    )
+    search_fields = ('vendor__username', 'vendor__company_name')
+    list_filter = ('vendor__company_name',)
+    readonly_fields = (
+        'vendor_company_name',
+        'total_revenue',
+        'total_vendor_amount',
+        'total_admin_amount',
+    )
+    inlines = [VendorFinancialTransactionInline]
+
+    def vendor_company_name(self, obj):
+        return obj.vendor.company_name
+    vendor_company_name.short_description = "Vendor Company Name"
+
+    def has_add_permission(self, request):
+        return False
+    
+@admin.register(VendorFinancialTransaction)
+class VendorFinancialTransactionAdmin(ImportExportModelAdmin, admin.ModelAdmin):
+    resource_class = VendorFinancialTransactionResource
+    list_display = (
+        'vendor_company_name',
+        'order',
+        'transaction_date',
+        'order_price',
+        'vendor_amount',
+        'admin_amount',
+    )
+    list_filter = ('vendor__company_name', 'transaction_date')
+    search_fields = ('vendor__username', 'vendor__company_name', 'order__id')
+    readonly_fields = (
+        'vendor_company_name',
+        'order',
+        'transaction_date',
+        'order_price',
+        'vendor_amount',
+        'admin_amount',
+    )
+    ordering = ('-transaction_date',)
+
+    def vendor_company_name(self, obj):
+        return obj.vendor.company_name
+    vendor_company_name.short_description = "Vendor Company Name"
+
+    def has_add_permission(self, request):
+        return False

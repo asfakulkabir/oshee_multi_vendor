@@ -15,6 +15,7 @@ from django.views.decorators.http import require_POST
 from orders.models import *
 from itertools import chain
 
+
 def home(request):
     testimonials_desktop = Testimonial.objects.filter(is_active=True, for_mobile=False)
     testimonials_mobile = Testimonial.objects.filter(is_active=True, for_mobile=True)
@@ -33,155 +34,175 @@ def home(request):
         'home_components':home_components,
     })
 
+# Helper function to get all descendant categories
+def get_descendants(category):
+    """Recursively gets a category and all its children/grandchildren."""
+    descendants = []
+    children = category.children.all()
+    for child in children:
+        descendants.append(child)
+        descendants.extend(get_descendants(child))
+    return descendants
+
 def category_detail(request, full_slug=None):
-    category = None
+    # --- Filters from request ---
+    min_price_param = request.GET.get('min_price')
+    max_price_param = request.GET.get('max_price')
+    search_query = request.GET.get('search', '').strip()
+    color_filter = request.GET.getlist('color')
+    size_filter = request.GET.getlist('size')
+    weight_filter = request.GET.getlist('weight')
+    sort_by = request.GET.get('sort_by', '-created_at')
+
+    # --- Fetch category and top-level categories ---
+    current_category = None
     if full_slug:
-        category = get_object_or_404(Category, slug=full_slug.split('/')[-1])
+        slug = full_slug.split('/')[-1]
+        current_category = get_object_or_404(Category, slug=slug)
 
-    categories = Category.objects.filter(parent__isnull=True).prefetch_related('children')
+    categories_for_menu = Category.objects.filter(parent__isnull=True).prefetch_related('children')
 
-    product_qs = Product.objects.filter(is_active=True)
-    vendor_product_qs = VendorProduct.objects.filter(is_active=True, status='approved')
+    # --- Initial QuerySets ---
+    products_qs = Product.objects.filter(is_active=True)
+    vendor_products_qs = VendorProduct.objects.filter(is_active=True, status='approved')
 
-    if category:
-        product_qs = product_qs.filter(categories=category).distinct()
-        vendor_product_qs = vendor_product_qs.filter(categories=category).distinct()
+    # --- Category filter (applies to querysets) ---
+    if current_category:
+        descendant_categories = [current_category] + get_descendants(current_category)
+        products_qs = products_qs.filter(categories__in=descendant_categories).distinct()
+        vendor_products_qs = vendor_products_qs.filter(categories__in=descendant_categories).distinct()
+    
+    # --- Pre-calculate filter ranges based on the filtered querysets ---
+    all_prices_in_qs = list(products_qs.values_list('regular_price', flat=True)) + \
+                       list(vendor_products_qs.values_list('regular_price', flat=True))
+    all_sale_prices_in_qs = list(products_qs.exclude(sale_price__isnull=True).values_list('sale_price', flat=True)) + \
+                            list(vendor_products_qs.exclude(sale_price__isnull=True).values_list('sale_price', flat=True))
+    
+    all_prices_for_range = [p for p in all_prices_in_qs + all_sale_prices_in_qs if p is not None]
+    
+    overall_min_price = min(all_prices_for_range) if all_prices_for_range else 0
+    overall_max_price = max(all_prices_for_range) if all_prices_for_range else 1000
 
-    combined_products = list(product_qs) + list(vendor_product_qs)
+    # --- Parse and apply price filters to querysets ---
+    try:
+        selected_min = float(min_price_param) if min_price_param else overall_min_price
+    except (ValueError, TypeError):
+        selected_min = overall_min_price
+    
+    try:
+        selected_max = float(max_price_param) if max_price_param else overall_max_price
+    except (ValueError, TypeError):
+        selected_max = overall_max_price
 
-    # Filter options
-    selected_min = request.GET.get('min_price')
-    selected_max = request.GET.get('max_price')
-    selected_colors = request.GET.getlist('color')
-    selected_sizes = request.GET.getlist('size')
-    selected_weights = request.GET.getlist('weight')
-    search_query = request.GET.get('search', '')
-    current_sort = request.GET.get('sort_by', 'default')
+    if selected_max < selected_min:
+        selected_max = selected_min
 
-    # Apply price filtering
-    def get_price(product):
-        return product.sale_price if getattr(product, 'sale_price', None) else product.regular_price
+    price_q = Q(Q(regular_price__gte=selected_min, regular_price__lte=selected_max) |
+                Q(sale_price__gte=selected_min, sale_price__lte=selected_max, sale_price__isnull=False))
+    
+    products_qs = products_qs.filter(price_q)
+    vendor_products_qs = vendor_products_qs.filter(price_q)
 
-    if selected_min:
-        try:
-            min_price_val = float(selected_min)
-            combined_products = [p for p in combined_products if get_price(p) >= min_price_val]
-        except ValueError:
-            pass
-
-    if selected_max:
-        try:
-            max_price_val = float(selected_max)
-            combined_products = [p for p in combined_products if get_price(p) <= max_price_val]
-        except ValueError:
-            pass
-
-    # Filter by color/size/weight (only applicable for ProductVariation)
-    if selected_colors or selected_sizes or selected_weights:
-        filtered_ids = ProductVariation.objects.filter(
-            Q(product__in=[p.id for p in combined_products if isinstance(p, Product)]) |
-            Q(product__in=[p.id for p in combined_products if isinstance(p, VendorProduct)])
-        )
-
-        if selected_colors:
-            filtered_ids = filtered_ids.filter(color__in=selected_colors)
-        if selected_sizes:
-            filtered_ids = filtered_ids.filter(size__in=selected_sizes)
-        if selected_weights:
-            filtered_ids = filtered_ids.filter(weight__in=selected_weights)
-
-        valid_product_ids = filtered_ids.values_list('product_id', flat=True).distinct()
-        combined_products = [p for p in combined_products if p.id in valid_product_ids]
-
-    # Search query
+    # --- Search filter (applies to querysets) ---
     if search_query:
-        combined_products = [
-            p for p in combined_products if search_query.lower() in p.name.lower()
-        ]
+        search_q = Q(name__icontains=search_query) | Q(short_description__icontains=search_query) | \
+                   Q(description__icontains=search_query) | Q(categories__name__icontains=search_query)
+        products_qs = products_qs.filter(search_q)
+        vendor_products_qs = vendor_products_qs.filter(search_q)
 
-    # Sort options
-    sort_options = {
-        'default': 'Default',
-        'name_asc': 'Name (A-Z)',
-        'name_desc': 'Name (Z-A)',
-        'price_asc': 'Price (Low to High)',
-        'price_desc': 'Price (High to Low)',
+    # --- Variation filters (applies to querysets) ---
+    variation_q = Q()
+    if color_filter:
+        variation_q &= Q(variations__color__in=color_filter)
+    if size_filter:
+        variation_q &= Q(variations__size__in=size_filter)
+    if weight_filter:
+        variation_q &= Q(variations__weight__in=weight_filter)
+    
+    if variation_q:
+        products_qs = products_qs.filter(variation_q).distinct()
+        vendor_products_qs = vendor_products_qs.filter(variation_q).distinct()
+
+    # --- Sorting (applies to querysets) ---
+    valid_sort_options = {
+        '-created_at': 'Newest',
+        'created_at': 'Oldest',
+        'name': 'Name (A-Z)',
+        '-name': 'Name (Z-A)',
+        'regular_price': 'Price (Low to High)',
+        '-regular_price': 'Price (High to Low)',
     }
+    sort_by = sort_by if sort_by in valid_sort_options else '-created_at'
+    products_qs = products_qs.order_by(sort_by)
+    vendor_products_qs = vendor_products_qs.order_by(sort_by)
 
-    if current_sort == 'name_asc':
-        combined_products.sort(key=lambda p: p.name.lower())
-    elif current_sort == 'name_desc':
-        combined_products.sort(key=lambda p: p.name.lower(), reverse=True)
-    elif current_sort == 'price_asc':
-        combined_products.sort(key=lambda p: get_price(p))
-    elif current_sort == 'price_desc':
-        combined_products.sort(key=lambda p: get_price(p), reverse=True)
-    else:
-        combined_products.sort(key=lambda p: p.created_at, reverse=True)
+    # --- Combine QuerySets + Paginate ---
+    combined_products = list(products_qs) + list(vendor_products_qs)
 
-    # Price range (for filter UI)
-    all_prices = [get_price(p) for p in combined_products]
-    min_price_overall = min(all_prices) if all_prices else 0
-    max_price_overall = max(all_prices) if all_prices else 1000
-
-    # Available filters
-    available_colors = ProductVariation.objects.filter(
-        color__isnull=False
-    ).exclude(color__exact='').values_list('color', flat=True).distinct().order_by('color')
-
-    available_sizes = ProductVariation.objects.filter(
-        size__isnull=False
-    ).exclude(size__exact='').values_list('size', flat=True).distinct().order_by('size')
-
-    available_weights = ProductVariation.objects.filter(
-        weight__isnull=False
-    ).exclude(weight__exact='').values_list('weight', flat=True).distinct().order_by('weight')
-
-    available_filters = {
-        'colors': list(available_colors),
-        'sizes': list(available_sizes),
-        'weights': list(available_weights),
-    }
-
-    # Pagination
     paginator = Paginator(combined_products, 50)
     page_number = request.GET.get('page')
-    try:
-        products_page = paginator.page(page_number)
-    except PageNotAnInteger:
-        products_page = paginator.page(1)
-    except EmptyPage:
-        products_page = paginator.page(paginator.num_pages)
+    page_obj = paginator.get_page(page_number)
 
-    # Wishlist (from cookies)
-    wishlist_ids_cookie_str = request.COOKIES.get('wishlist_ids', '[]')
-    try:
-        initial_wishlist_ids = json.loads(wishlist_ids_cookie_str)
-        initial_wishlist_ids = [str(id) for id in initial_wishlist_ids]
-    except json.JSONDecodeError:
-        initial_wishlist_ids = []
+    # --- Sidebar filters (dynamic, based on the filtered querysets) ---
+    filtered_product_ids = list(products_qs.values_list('id', flat=True))
+    filtered_vendor_product_ids = list(vendor_products_qs.values_list('id', flat=True))
 
-    context = {
-        'category': category,
-        'current_category': category.slug if category else None,
-        'categories': categories,
-        'products': products_page,
-        'selected_min': float(selected_min) if selected_min else min_price_overall,
-        'selected_max': float(selected_max) if selected_max else max_price_overall,
-        'min_price': min_price_overall,
-        'max_price': max_price_overall,
-        'available_filters': available_filters,
-        'selected_colors': selected_colors,
-        'selected_sizes': selected_sizes,
-        'selected_weights': selected_weights,
-        'search_query': search_query,
-        'sort_options': sort_options,
-        'current_sort': current_sort,
-        'wishlist_ids': initial_wishlist_ids,
+    product_variations_qs = ProductVariation.objects.filter(product_id__in=filtered_product_ids)
+    vendor_product_variations_qs = VendorProductVariation.objects.filter(product_id__in=filtered_vendor_product_ids)
+
+    # Get available colors
+    all_colors = (
+        set(product_variations_qs.exclude(color__exact='').values_list('color', flat=True).distinct())
+        .union(set(vendor_product_variations_qs.exclude(color__exact='').values_list('color', flat=True).distinct()))
+    )
+    colors = sorted([c for c in all_colors if c is not None])
+
+    # Get available sizes
+    all_sizes = (
+        set(product_variations_qs.exclude(size__exact='').values_list('size', flat=True).distinct())
+        .union(set(vendor_product_variations_qs.exclude(size__exact='').values_list('size', flat=True).distinct()))
+    )
+    sizes = sorted([s for s in all_sizes if s is not None])
+
+    # Get available weights
+    all_weights = (
+        set(product_variations_qs.exclude(weight__exact='').values_list('weight', flat=True).distinct())
+        .union(set(vendor_product_variations_qs.exclude(weight__exact='').values_list('weight', flat=True).distinct()))
+    )
+    weights = sorted([w for w in all_weights if w is not None])
+
+    available_filters = {
+        'colors': colors,
+        'sizes': sizes,
+        'weights': weights,
     }
 
-    return render(request, 'website/category_detail.html', context)
+    # --- Wishlist from cookies ---
+    try:
+        wishlist_ids = json.loads(request.COOKIES.get('wishlist_ids', '[]'))
+        wishlist_ids = [str(w) for w in wishlist_ids]
+    except json.JSONDecodeError:
+        wishlist_ids = []
 
+    # --- Context for template ---
+    context = {
+        'products': page_obj,
+        'categories': categories_for_menu,
+        'min_price': overall_min_price,
+        'max_price': overall_max_price,
+        'selected_min': selected_min,
+        'selected_max': selected_max,
+        'available_filters': available_filters,
+        'selected_colors': color_filter,
+        'selected_sizes': size_filter,
+        'selected_weights': weight_filter,
+        'sort_options': valid_sort_options,
+        'current_sort': sort_by,
+        'search_query': search_query,
+        'current_category': current_category,
+        'wishlist_ids': wishlist_ids,
+    }
+    return render(request, 'website/category_detail.html', context)
 def product_detail(request, slug):
     try:
         product = Product.objects.get(slug=slug)
@@ -226,7 +247,7 @@ def product_detail(request, slug):
     return render(request, 'website/product_detail.html', context)
 
 def shop(request):
-    # Filters from request
+    # --- Filters from request ---
     category_slug = request.GET.get('category')
     min_price_param = request.GET.get('min_price')
     max_price_param = request.GET.get('max_price')
@@ -236,22 +257,21 @@ def shop(request):
     weight_filter = request.GET.getlist('weight')
     sort_by = request.GET.get('sort_by', '-created_at')
 
-    # Parse prices
+    # --- Parse prices ---
     try:
         selected_min_from_url = float(min_price_param) if min_price_param else None
     except ValueError:
         selected_min_from_url = None
-
     try:
         selected_max_from_url = float(max_price_param) if max_price_param else None
     except ValueError:
         selected_max_from_url = None
 
-    # Fetch all active products
+    # --- Fetch all active products ---
     all_products = Product.objects.filter(is_active=True)
     all_vendor_products = VendorProduct.objects.filter(status='approved')
 
-    # Aggregate prices for slider range
+    # --- Aggregate prices ---
     all_prices = list(all_products.values_list('regular_price', flat=True)) + \
                  list(all_vendor_products.values_list('regular_price', flat=True))
     overall_min_price = min(all_prices) if all_prices else 0
@@ -262,11 +282,11 @@ def shop(request):
     if max_price_filter < min_price_filter:
         max_price_filter = min_price_filter
 
-    # Initial querysets with prefetching
+    # --- Prefetch ---
     products = all_products.prefetch_related('images', 'variations')
     vendor_products = all_vendor_products.prefetch_related('images', 'variations')
 
-    # Category filter
+    # --- Category filter ---
     if category_slug:
         category = Category.objects.filter(slug=category_slug.split('/')[-1]).first()
         if category:
@@ -280,19 +300,20 @@ def shop(request):
             products = products.filter(categories__in=all_categories)
             vendor_products = vendor_products.filter(categories__in=all_categories)
 
-    # Price filter
+    # --- Price filter ---
     price_filter = Q(regular_price__gte=min_price_filter, regular_price__lte=max_price_filter) | \
                    Q(sale_price__gte=min_price_filter, sale_price__lte=max_price_filter, sale_price__isnull=False)
     products = products.filter(price_filter)
     vendor_products = vendor_products.filter(price_filter)
 
-    # Search filter
+    # --- Search filter ---
     if search_query:
-        search_q = Q(name__icontains=search_query) | Q(short_description__icontains=search_query) | Q(description__icontains=search_query) | Q(categories__name__icontains=search_query)
+        search_q = Q(name__icontains=search_query) | Q(short_description__icontains=search_query) | \
+                   Q(description__icontains=search_query) | Q(categories__name__icontains=search_query)
         products = products.filter(search_q)
         vendor_products = vendor_products.filter(search_q)
 
-    # Variation filters
+    # --- Variation filters ---
     variation_q = Q()
     if color_filter:
         variation_q &= Q(variations__color__in=color_filter)
@@ -304,7 +325,7 @@ def shop(request):
         products = products.filter(variation_q)
         vendor_products = vendor_products.filter(variation_q)
 
-    # Sorting
+    # --- Sorting ---
     valid_sort_options = {
         '-created_at': 'Newest',
         'created_at': 'Oldest',
@@ -317,29 +338,45 @@ def shop(request):
     products = products.order_by(sort_by)
     vendor_products = vendor_products.order_by(sort_by)
 
-    # Combine and paginate
+    # --- Combine + paginate ---
     combined_products = sorted(
         chain(products, vendor_products),
-        key=lambda x: getattr(x, sort_by.lstrip('-')),
+        key=lambda x: getattr(x, sort_by.lstrip('-')) or 0,
         reverse=sort_by.startswith('-')
     )
     paginator = Paginator(combined_products, 50)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    # Filters (for sidebar)
+    # --- Sidebar filters (merged Product + VendorProduct variations) ---
+    # Colors
+    product_colors = ProductVariation.objects.filter(product__in=all_products).exclude(color__isnull=True).exclude(color__exact='').values_list('color', flat=True).distinct()
+    vendor_colors = VendorProductVariation.objects.filter(product__in=all_vendor_products).exclude(color__isnull=True).exclude(color__exact='').values_list('color', flat=True).distinct()
+    colors = sorted(set(product_colors).union(set(vendor_colors)))
+
+    # Sizes
+    product_sizes = ProductVariation.objects.filter(product__in=all_products).exclude(size__isnull=True).exclude(size__exact='').values_list('size', flat=True).distinct()
+    vendor_sizes = VendorProductVariation.objects.filter(product__in=all_vendor_products).exclude(size__isnull=True).exclude(size__exact='').values_list('size', flat=True).distinct()
+    sizes = sorted(set(product_sizes).union(set(vendor_sizes)))
+
+    # Weights
+    product_weights = ProductVariation.objects.filter(product__in=all_products).exclude(weight__isnull=True).exclude(weight__exact='').values_list('weight', flat=True).distinct()
+    vendor_weights = VendorProductVariation.objects.filter(product__in=all_vendor_products).exclude(weight__isnull=True).exclude(weight__exact='').values_list('weight', flat=True).distinct()
+    weights = sorted(set(product_weights).union(set(vendor_weights)))
+
     available_filters = {
-        'colors': ProductVariation.objects.filter(product__in=all_products).exclude(color='').values_list('color', flat=True).distinct(),
-        'sizes': ProductVariation.objects.filter(product__in=all_products).exclude(size='').values_list('size', flat=True).distinct(),
-        'weights': ProductVariation.objects.filter(product__in=all_products).exclude(weight='').values_list('weight', flat=True).distinct(),
+        'colors': colors,
+        'sizes': sizes,
+        'weights': weights,
     }
 
-    # Wishlist
+    # --- Wishlist ---
     try:
         wishlist_ids = json.loads(request.COOKIES.get('wishlist_ids', '[]'))
     except json.JSONDecodeError:
         wishlist_ids = []
 
+    # --- Context ---
     context = {
         'products': page_obj,
         'categories': Category.objects.filter(parent__isnull=True),
@@ -360,10 +397,8 @@ def shop(request):
     return render(request, 'website/shop.html', context)
 
 
-
 def wishlist_page_view(request):
     return render(request, 'website/wishlist.html', {})
-
 
 @require_POST
 @csrf_exempt
@@ -378,24 +413,49 @@ def wishlist_products_api(request):
         if not isinstance(product_ids_from_frontend, list):
             return JsonResponse({"error": "product_ids must be a list."}, status=400)
 
-        valid_product_ids = [pid for pid in product_ids_from_frontend if isinstance(pid, (str, int))]
+        # Separate IDs
+        regular_ids = []
+        vendor_ids = []
 
-        wishlist_products = Product.objects.filter(pk__in=valid_product_ids, is_active=True).order_by('name')
+        for pid in product_ids_from_frontend:
+            if isinstance(pid, str):
+                if pid.startswith('p-'):
+                    try:
+                        regular_ids.append(int(pid.split('-')[1]))
+                    except (ValueError, IndexError):
+                        continue
+                elif pid.startswith('v-'):
+                    try:
+                        vendor_ids.append(int(pid.split('-')[1]))
+                    except (ValueError, IndexError):
+                        continue
+
+        regular_products = Product.objects.filter(pk__in=regular_ids, is_active=True)
+        vendor_products = VendorProduct.objects.filter(pk__in=vendor_ids, status='approved')
+
+        all_wishlist_products = list(regular_products) + list(vendor_products)
+        all_wishlist_products.sort(key=lambda x: x.name or "")
 
         serialized_products = []
-        for product in wishlist_products:
+        for product in all_wishlist_products:
             image_url = '/static/icons/default-image.webp'
-            if product.images.exists() and product.images.first().image:
-                image_url = product.images.first().image.url
+            product_images = getattr(product, 'images', None)
+
+            if product_images and product_images.exists() and product_images.first().image:
+                image_url = product_images.first().image.url
+
+            sale_price = float(product.sale_price) if product.sale_price else None
+            regular_price = float(product.regular_price) if product.regular_price else 0.0
 
             serialized_products.append({
-                'id': str(product.id),
+                'id': product.prefixed_id,
                 'name': product.name,
                 'slug': product.slug,
-                'regular_price': float(product.regular_price),
-                'sale_price': float(product.sale_price) if product.sale_price is not None else None,
+                'regular_price': regular_price,
+                'sale_price': sale_price,
                 'image': image_url,
             })
+
         return JsonResponse(serialized_products, safe=False)
 
     except json.JSONDecodeError:
@@ -404,11 +464,9 @@ def wishlist_products_api(request):
         import logging
         logger = logging.getLogger(__name__)
         logger.exception("Error in wishlist_products_api:")
-        return JsonResponse({"error": f"An unexpected error occurred: {str(e)}"}, status=500)
-
-
-
-
+        return JsonResponse({"error": "An unexpected error occurred."}, status=500)
+    
+    
 def checkout_ecommerce(request):
     if request.method == 'POST':
         try:
@@ -430,7 +488,7 @@ def checkout_ecommerce(request):
                     total_amount += price * quantity
 
                     vendor_id = item.get('vendor_id')
-                    if not vendor_id:
+                    if vendor_id in [None, '']:
                         return JsonResponse({'error': f"Missing vendor_id for item: {item.get('name', 'Unknown')}"}, status=400)
 
                     cleaned_cart_items.append({
@@ -440,6 +498,7 @@ def checkout_ecommerce(request):
                         'quantity': int(quantity),
                         'variation': item.get('variation', {}),
                         'vendor_id': str(vendor_id),
+                        'product_id': str(item.get('product_id')),
                     })
                 except Exception as item_error:
                     return JsonResponse({'error': f"Error processing item: {item_error}"}, status=400)
@@ -488,11 +547,7 @@ def order_success(request):
         'order': order,
     })
 
-
-
 def search(request):
-    products = Product.objects.filter(is_active=True).prefetch_related('images', 'variations')
-
     category_slug = request.GET.get('category')
     min_price_param = request.GET.get('min_price')
     max_price_param = request.GET.get('max_price')
@@ -502,91 +557,91 @@ def search(request):
     weight_filter = request.GET.getlist('weight')
     sort_by = request.GET.get('sort_by', '-created_at')
 
-    all_active_products = Product.objects.filter(is_active=True)
+    # Base queries
+    products_qs = Product.objects.filter(is_active=True)
+    vendor_products_qs = VendorProduct.objects.filter(status='approved', is_active=True)
 
-    overall_price_aggregates = all_active_products.aggregate(
-        min_p=Min('regular_price'),
-        max_p=Max('regular_price')
+    # Price range calculation
+    overall_min_price = min(
+        products_qs.aggregate(p=Min('regular_price'))['p'] or float('inf'),
+        vendor_products_qs.aggregate(p=Min('regular_price'))['p'] or float('inf')
     )
-
-    overall_min_price = overall_price_aggregates['min_p'] if overall_price_aggregates['min_p'] is not None else 0
-    overall_max_price = overall_price_aggregates['max_p'] if overall_price_aggregates['max_p'] is not None else 1000
+    overall_max_price = max(
+        products_qs.aggregate(p=Max('regular_price'))['p'] or 0,
+        vendor_products_qs.aggregate(p=Max('regular_price'))['p'] or 0
+    )
+    if overall_min_price == float('inf'):
+        overall_min_price = 0
     overall_max_price += 100
 
-    selected_min_from_url = None
-    selected_max_from_url = None
+    # Selected price from request
+    try:
+        selected_min = float(min_price_param) if min_price_param else overall_min_price
+    except ValueError:
+        selected_min = overall_min_price
 
     try:
-        if min_price_param:
-            selected_min_from_url = float(min_price_param)
+        selected_max = float(max_price_param) if max_price_param else overall_max_price
     except ValueError:
-        pass
+        selected_max = overall_max_price
 
-    try:
-        if max_price_param:
-            selected_max_from_url = float(max_price_param)
-    except ValueError:
-        pass
+    if selected_max < selected_min:
+        selected_max = selected_min
 
-    min_price_filter = selected_min_from_url if selected_min_from_url is not None else overall_min_price
-    max_price_filter = selected_max_from_url if selected_max_from_url is not None else overall_max_price
-
-    if max_price_filter < min_price_filter:
-        max_price_filter = min_price_filter
-
+    # Category filtering
     if category_slug:
-        if '/' in category_slug:
-            last_slug = category_slug.split('/')[-1]
-            category = Category.objects.filter(slug=last_slug).first()
-        else:
-            category = Category.objects.filter(slug=category_slug).first()
-
+        last_slug = category_slug.split('/')[-1]
+        category = Category.objects.filter(slug=last_slug).first()
         if category:
             def get_descendants(cat):
                 descendants = list(cat.children.all())
                 for child in cat.children.all():
                     descendants.extend(get_descendants(child))
                 return descendants
-
             all_categories = [category] + get_descendants(category)
-            products = products.filter(categories__in=all_categories).distinct()
+            products_qs = products_qs.filter(categories__in=all_categories).distinct()
+            vendor_products_qs = vendor_products_qs.filter(categories__in=all_categories).distinct()
 
-    if min_price_filter is not None or max_price_filter is not None:
-        if min_price_filter is not None and max_price_filter is not None:
-            products = products.filter(
-                Q(regular_price__gte=min_price_filter, regular_price__lte=max_price_filter) |
-                Q(sale_price__gte=min_price_filter, sale_price__lte=max_price_filter, sale_price__isnull=False)
-            ).distinct()
-        elif min_price_filter is not None:
-            products = products.filter(
-                Q(regular_price__gte=min_price_filter) |
-                Q(sale_price__gte=min_price_filter, sale_price__isnull=False)
-            ).distinct()
-        elif max_price_filter is not None:
-            products = products.filter(
-                Q(regular_price__lte=max_price_filter) |
-                Q(sale_price__lte=max_price_filter, sale_price__isnull=False)
-            ).distinct()
+    # Price filtering
+    price_filter = Q(regular_price__gte=selected_min, regular_price__lte=selected_max) | \
+                   Q(sale_price__gte=selected_min, sale_price__lte=selected_max, sale_price__isnull=False)
+    products_qs = products_qs.filter(price_filter).distinct()
+    vendor_products_qs = vendor_products_qs.filter(price_filter).distinct()
 
+    # Search filtering
     if search_query:
-        products = products.filter(
-            Q(name__icontains=search_query) |
-            Q(short_description__icontains=search_query) |
-            Q(description__icontains=search_query) |
-            Q(categories__name__icontains=search_query)
-        ).distinct()
+        search_q = Q(name__icontains=search_query) | \
+                   Q(short_description__icontains=search_query) | \
+                   Q(description__icontains=search_query) | \
+                   Q(categories__name__icontains=search_query)
+        products_qs = products_qs.filter(search_q).distinct()
+        vendor_products_qs = vendor_products_qs.filter(search_q).distinct()
 
-    variation_filters = Q()
+    # Variation filters
+    variation_q = Q()
     if color_filter:
-        variation_filters &= Q(variations__color__in=color_filter)
+        variation_q &= Q(variations__color__in=color_filter)
     if size_filter:
-        variation_filters &= Q(variations__size__in=size_filter)
+        variation_q &= Q(variations__size__in=size_filter)
     if weight_filter:
-        variation_filters &= Q(variations__weight__in=weight_filter)
+        variation_q &= Q(variations__weight__in=weight_filter)
+    if variation_q:
+        products_qs = products_qs.filter(variation_q).distinct()
 
-    if variation_filters:
-        products = products.filter(variation_filters).distinct()
+    vendor_variation_q = Q()
+    if color_filter:
+        vendor_variation_q &= Q(vendor_variations__color__in=color_filter)
+    if size_filter:
+        vendor_variation_q &= Q(vendor_variations__size__in=size_filter)
+    if weight_filter:
+        vendor_variation_q &= Q(vendor_variations__weight__in=weight_filter)
+    if vendor_variation_q:
+        vendor_products_qs = vendor_products_qs.filter(vendor_variation_q).distinct()
 
+    # Combine all products
+    all_combined = list(products_qs) + list(vendor_products_qs)
+
+    # Sorting
     valid_sort_options = {
         '-created_at': 'Newest',
         'created_at': 'Oldest',
@@ -595,45 +650,57 @@ def search(request):
         'regular_price': 'Price (Low to High)',
         '-regular_price': 'Price (High to Low)',
     }
-
     if sort_by in valid_sort_options:
-        products = products.order_by(sort_by)
+        reverse = sort_by.startswith('-')
+        key = sort_by.lstrip('-')
+        all_combined.sort(key=lambda x: getattr(x, key, 0) or 0, reverse=reverse)
     else:
         sort_by = '-created_at'
-        products = products.order_by(sort_by)
+        all_combined.sort(key=lambda x: getattr(x, 'created_at', None) or 0, reverse=True)
 
-    available_filters = {
-        'colors': ProductVariation.objects.filter(product__in=all_active_products)
-                                .exclude(color__isnull=True).exclude(color__exact='')
-                                .values_list('color', flat=True).distinct().order_by('color'),
-        'sizes': ProductVariation.objects.filter(product__in=all_active_products)
-                                .exclude(size__isnull=True).exclude(size__exact='')
-                                .values_list('size', flat=True).distinct().order_by('size'),
-        'weights': ProductVariation.objects.filter(product__in=all_active_products)
-                                .exclude(weight__isnull=True).exclude(weight__exact='')
-                                .values_list('weight', flat=True).distinct().order_by('weight'),
-    }
-
-    paginator = Paginator(products, 50)
+    # Pagination
+    paginator = Paginator(all_combined, 50)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Filters (without None/empty values)
+    variation_qs = ProductVariation.objects.filter(product__in=products_qs)
+    vendor_variation_qs = VendorProductVariation.objects.filter(product__in=vendor_products_qs)
+
+    colors = sorted(set(
+        list(variation_qs.exclude(color__isnull=True).exclude(color__exact='').values_list('color', flat=True)) +
+        list(vendor_variation_qs.exclude(color__isnull=True).exclude(color__exact='').values_list('color', flat=True))
+    ))
+
+    sizes = sorted(set(
+        list(variation_qs.exclude(size__isnull=True).exclude(size__exact='').values_list('size', flat=True)) +
+        list(vendor_variation_qs.exclude(size__isnull=True).exclude(size__exact='').values_list('size', flat=True))
+    ))
+
+    weights = sorted(set(
+        list(variation_qs.exclude(weight__isnull=True).exclude(weight__exact='').values_list('weight', flat=True)) +
+        list(vendor_variation_qs.exclude(weight__isnull=True).exclude(weight__exact='').values_list('weight', flat=True))
+    ))
+
+    # Wishlist
     wishlist_ids_cookie_str = request.COOKIES.get('wishlist_ids', '[]')
     try:
-        initial_wishlist_ids = json.loads(wishlist_ids_cookie_str)
-        initial_wishlist_ids = [str(id) for id in initial_wishlist_ids]
+        initial_wishlist_ids = [str(i) for i in json.loads(wishlist_ids_cookie_str)]
     except json.JSONDecodeError:
         initial_wishlist_ids = []
-
 
     context = {
         'products': page_obj,
         'categories': Category.objects.filter(parent__isnull=True),
         'min_price': overall_min_price,
         'max_price': overall_max_price,
-        'selected_min': min_price_filter,
-        'selected_max': max_price_filter,
-        'available_filters': available_filters,
+        'selected_min': selected_min,
+        'selected_max': selected_max,
+        'available_filters': {
+            'colors': colors,
+            'sizes': sizes,
+            'weights': weights,
+        },
         'selected_colors': color_filter,
         'selected_sizes': size_filter,
         'selected_weights': weight_filter,
@@ -643,7 +710,6 @@ def search(request):
         'current_category': category_slug or '',
         'wishlist_ids': initial_wishlist_ids,
     }
-
     return render(request, 'website/search.html', context)
 
 def track_order(request):

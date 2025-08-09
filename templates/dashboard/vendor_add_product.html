@@ -1,6 +1,7 @@
 {% extends "_base/_base.html" %}
 {% load static %}
 
+{% block title %}Add New Product{% endblock %}
 {% block content %}
 <div class="container mx-auto max-w-4xl py-12 px-4">
     <div class="bg-white shadow-xl rounded-lg p-8">
@@ -9,46 +10,153 @@
         <form method="POST" enctype="multipart/form-data" id="product-form">
             {% csrf_token %}
 
-            <div class="mb-8">
+            <div class="mb-8" x-data="{
+    regularPrice: 0,
+    salePrice: 0,
+    vendorPrice: 0,
+    adminCommission: 0,
+    useSalePrice: false,
+    useVendorPrice: true,
+    useAdminCommission: false,
+    salePriceError: false,
+    adminCommissionError: false,
+
+    get mainPrice() {
+        return this.useSalePrice && this.salePrice > 0 ? this.salePrice : this.regularPrice;
+    },
+
+    get calculatedVendorPrice() {
+        if (this.useAdminCommission) {
+            let commissionAmount = this.mainPrice * (this.adminCommission / 100);
+            return (this.mainPrice - commissionAmount).toFixed(2);
+        }
+        return this.vendorPrice;
+    },
+    
+    get calculatedAdminCommission() {
+        if (this.useVendorPrice && this.mainPrice > 0) {
+            let commissionAmount = this.mainPrice - this.vendorPrice;
+            let commissionPercentage = (commissionAmount / this.mainPrice) * 100;
+            return commissionPercentage.toFixed(2);
+        }
+        return this.adminCommission;
+    }
+}" x-init="$watch('salePrice', value => {
+    if (value >= regularPrice && value > 0) {
+        salePriceError = true;
+    } else {
+        salePriceError = false;
+    }
+});
+$watch('adminCommission', value => {
+    if (value > 90) {
+        adminCommissionError = true;
+    } else {
+        adminCommissionError = false;
+    }
+});">
                 <h3 class="text-xl font-semibold text-gray-700 mb-4">Product Details</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div class="md:col-span-2">
                         <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
-                        <input type="text" id="name" name="name" placeholder="Product Name" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3" required>
+                        <input type="text" id="name" name="name" placeholder="Product Name"
+                            class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3"
+                            required>
                     </div>
                     <div class="md:col-span-2">
-                        <label for="short_description" class="block text-sm font-medium text-gray-700 mb-1">Short Description</label>
-                        <textarea id="short_description" name="short_description" placeholder="A brief, engaging summary of the product" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3"></textarea>
+                        <label for="short_description" class="block text-sm font-medium text-gray-700 mb-1">Short
+                            Description</label>
+                        <textarea id="short_description" name="short_description"
+                            placeholder="A brief, engaging summary of the product"
+                            class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3"></textarea>
                     </div>
                     <div class="md:col-span-2">
-                        <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Full Description</label>
-                        <textarea id="description" name="description" placeholder="A detailed description with key features and benefits" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 h-32"></textarea>
+                        <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Full
+                            Description</label>
+                        <textarea id="description" name="description"
+                            placeholder="A detailed description with key features and benefits"
+                            class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 h-32"></textarea>
                     </div>
-                    <div>
-                        <label for="regular_price" class="block text-sm font-medium text-gray-700 mb-1">Regular Price</label>
-                        <input type="number" step="0.01" id="regular_price" name="regular_price" placeholder="e.g., 99.99" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
-                    </div>
-                    <div>
-                        <label for="sale_price" class="block text-sm font-medium text-gray-700 mb-1">Sale Price</label>
-                        <input type="number" step="0.01" id="sale_price" name="sale_price" placeholder="e.g., 79.99" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
-                    </div>
-                    <div>
-                        <label for="vendor_price" class="block text-sm font-medium text-gray-700 mb-1">Vendor Price</label>
-                        <input type="number" step="0.01" id="vendor_price" name="vendor_price" placeholder="e.g., 50.00" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
-                    </div>
-                    <div>
-                        <label for="stock_quantity" class="block text-sm font-medium text-gray-700 mb-1">Stock Quantity</label>
-                        <input type="number" id="stock_quantity" name="stock_quantity" placeholder="Number in stock" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
-                    </div>
-                </div>
 
-                <div class="mb-6">
-                    <label for="product_type" class="block text-sm font-medium text-gray-700 mb-1">Product Type</label>
-                    <select id="product_type" name="product_type" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
-                        {% for key, label in product_types %}
-                        <option value="{{ key }}">{{ label }}</option>
-                        {% endfor %}
-                    </select>
+                    <div>
+                        <label for="regular_price" class="block text-sm font-medium text-gray-700 mb-1">Regular
+                            Price</label>
+                        <input type="number" step="0.01" id="regular_price" name="regular_price"
+                            x-model.number="regularPrice" placeholder="e.g., 99.99"
+                            class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3" required>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center space-x-2 mb-1">
+                            <input type="checkbox" id="sale_price_checkbox" x-model="useSalePrice"
+                                class="form-checkbox h-4 w-4 text-blue-600 rounded-md">
+                            <label for="sale_price_checkbox" class="text-sm font-medium text-gray-700">Sale
+                                Price</label>
+                        </div>
+                        <input type="number" step="0.01" id="sale_price" name="sale_price"
+                            x-bind:disabled="!useSalePrice" x-bind:value="useSalePrice ? salePrice : ''"
+                            x-model.number="salePrice" placeholder="e.g., 79.99"
+                            class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 disabled:bg-gray-100 disabled:text-gray-500"
+                            x-bind:class="{ 'border-red-500': salePriceError }">
+                        <p x-show="salePriceError" class="mt-1 text-sm text-red-600">Sale price must be less than
+                            regular price.</p>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center space-x-2 mb-1">
+                            <input type="checkbox" id="vendor_price_checkbox" name="vendor_price_checkbox"
+                                x-model="useVendorPrice" @change="useAdminCommission = false"
+                                class="form-checkbox h-4 w-4 text-blue-600 rounded-md">
+                            <label for="vendor_price_checkbox" class="text-sm font-medium text-gray-700">Vendor
+                                Price</label>
+                        </div>
+                        <input type="number" step="0.01" id="vendor_price" name="vendor_price"
+                            x-bind:disabled="!useVendorPrice"
+                            x-bind:value="useVendorPrice ? vendorPrice : calculatedVendorPrice"
+                            x-model.number="vendorPrice" placeholder="e.g., 50.00"
+                            class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 disabled:bg-gray-100 disabled:text-gray-500" required>
+                        <input type="hidden" name="vendor_price"
+                            x-bind:value="useVendorPrice ? vendorPrice : calculatedVendorPrice">
+                    </div>
+
+                    <div>
+                        <div class="flex items-center space-x-2 mb-1">
+                            <input type="checkbox" id="admin_commission_checkbox" name="admin_commission_checkbox"
+                                x-model="useAdminCommission" @change="useVendorPrice = false"
+                                class="form-checkbox h-4 w-4 text-blue-600 rounded-md">
+                            <label for="admin_commission_checkbox" class="text-sm font-medium text-gray-700">Admin
+                                Commission (%)</label>
+                        </div>
+                        <input type="number" step="0.01" id="admin_commission" name="admin_commission"
+                            x-bind:disabled="!useAdminCommission"
+                            x-bind:value="useAdminCommission ? adminCommission : calculatedAdminCommission"
+                            x-model.number="adminCommission" placeholder="e.g., 10.00"
+                            class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 disabled:bg-gray-100 disabled:text-gray-500"
+                            x-bind:class="{ 'border-red-500': adminCommissionError }">
+                        <p x-show="adminCommissionError" class="mt-1 text-sm text-red-600">Admin commission cannot be
+                            greater than 90%.</p>
+                        <input type="hidden" name="admin_commission"
+                            x-bind:value="useAdminCommission ? adminCommission : calculatedAdminCommission">
+                    </div>
+                    <div class="hidden">
+                        <input type="hidden" name="is_active" value="on">
+                    </div>
+                    <div>
+                        <label for="stock_quantity" class="block text-sm font-medium text-gray-700 mb-1">Stock
+                            Quantity</label>
+                        <input type="number" id="stock_quantity" name="stock_quantity" placeholder="Number in stock"
+                            class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3" value="1">
+                    </div>
+                    <div>
+                        <label for="product_type" class="block text-sm font-medium text-gray-700 mb-1">Product
+                            Type</label>
+                        <select id="product_type" name="product_type"
+                            class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
+                            {% for key, label in product_types %}
+                            <option value="{{ key }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
 
                 <div>
@@ -56,7 +164,8 @@
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                         {% for category in categories %}
                         <label class="inline-flex items-center">
-                            <input type="checkbox" name="categories" value="{{ category.id }}" class="form-checkbox h-4 w-4 text-blue-600 rounded-md">
+                            <input type="checkbox" name="categories" value="{{ category.id }}"
+                                class="form-checkbox h-4 w-4 text-blue-600 rounded-md">
                             <span class="ml-2 text-sm text-gray-700">{{ category.name }}</span>
                         </label>
                         {% endfor %}
@@ -69,10 +178,14 @@
             <div class="mb-8">
                 <h3 class="text-xl font-semibold text-gray-700 mb-4">Product Images</h3>
                 <div id="image-fields" class="space-y-6">
-                    </div>
-                <button type="button" onclick="addImageField()" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                </div>
+                <button type="button" onclick="addImageField()"
+                    class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                        fill="currentColor">
+                        <path fill-rule="evenodd"
+                            d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                            clip-rule="evenodd" />
                     </svg>
                     Add Image
                 </button>
@@ -83,10 +196,14 @@
             <div class="mb-8">
                 <h3 class="text-xl font-semibold text-gray-700 mb-4">Product Variations</h3>
                 <div id="variation-fields" class="space-y-6">
-                    </div>
-                <button type="button" onclick="addVariationField()" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                </div>
+                <button type="button" onclick="addVariationField()"
+                    class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                        fill="currentColor">
+                        <path fill-rule="evenodd"
+                            d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                            clip-rule="evenodd" />
                     </svg>
                     Add Variation
                 </button>
@@ -99,17 +216,23 @@
                 <div class="space-y-6">
                     <div>
                         <label for="seo_title" class="block text-sm font-medium text-gray-700 mb-1">SEO Title</label>
-                        <input type="text" id="seo_title" name="seo_title" placeholder="A compelling title for search engines" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
+                        <input type="text" id="seo_title" name="seo_title"
+                            placeholder="A compelling title for search engines"
+                            class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3">
                     </div>
                     <div>
-                        <label for="meta_description" class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
-                        <textarea id="meta_description" name="meta_description" placeholder="A concise summary of the product for search results" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 h-24"></textarea>
+                        <label for="meta_description" class="block text-sm font-medium text-gray-700 mb-1">Meta
+                            Description</label>
+                        <textarea id="meta_description" name="meta_description"
+                            placeholder="A concise summary of the product for search results"
+                            class="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 h-24"></textarea>
                     </div>
                 </div>
             </div>
 
             <div class="mt-10 pt-4 border-t border-gray-200 flex justify-end">
-                <button type="submit" class="bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300">
+                <button type="submit"
+                    class="bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300">
                     Add Product
                 </button>
             </div>
@@ -118,16 +241,16 @@
 </div>
 
 <script>
-let imageCount = 0;
-let variationCount = 0;
+    let imageCount = 0;
+    let variationCount = 0;
 
-function addImageField() {
-    const container = document.getElementById('image-fields');
-    const index = imageCount++;
+    function addImageField() {
+        const container = document.getElementById('image-fields');
+        const index = imageCount++;
 
-    const div = document.createElement('div');
-    div.className = "p-6 border border-gray-200 rounded-lg shadow-sm relative";
-    div.innerHTML = `
+        const div = document.createElement('div');
+        div.className = "p-6 border border-gray-200 rounded-lg shadow-sm relative";
+        div.innerHTML = `
         <button type="button" onclick="this.parentElement.remove()" class="absolute top-3 right-3 text-red-500 hover:text-red-700 text-2xl transition duration-200">
             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -159,16 +282,16 @@ function addImageField() {
             </div>
         </div>
     `;
-    container.appendChild(div);
-}
+        container.appendChild(div);
+    }
 
-function addVariationField() {
-    const container = document.getElementById('variation-fields');
-    const index = variationCount++;
+    function addVariationField() {
+        const container = document.getElementById('variation-fields');
+        const index = variationCount++;
 
-    const div = document.createElement('div');
-    div.className = "p-6 border border-gray-200 rounded-lg shadow-sm relative";
-    div.innerHTML = `
+        const div = document.createElement('div');
+        div.className = "p-6 border border-gray-200 rounded-lg shadow-sm relative";
+        div.innerHTML = `
         <button type="button" onclick="this.parentElement.remove()" class="absolute top-3 right-3 text-red-500 hover:text-red-700 text-2xl transition duration-200">
             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -197,13 +320,13 @@ function addVariationField() {
             </div>
         </div>
     `;
-    container.appendChild(div);
-}
+        container.appendChild(div);
+    }
 
-// Add one by default
-document.addEventListener('DOMContentLoaded', () => {
-    addImageField();
-    addVariationField();
-});
+    // Add one by default
+    document.addEventListener('DOMContentLoaded', () => {
+        addImageField();
+        addVariationField();
+    });
 </script>
 {% endblock %}

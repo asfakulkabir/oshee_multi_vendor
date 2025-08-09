@@ -1,3 +1,4 @@
+import django
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
@@ -9,6 +10,11 @@ from django.contrib.auth.models import AbstractBaseUser
 from accounts.models import CustomUser 
 from accounts.forms import VendorRegistrationForm, LoginForm
 from django.utils.crypto import get_random_string
+from django.core.mail import send_mail
+from .models import CustomUser
+from django.conf import settings
+from django.template.loader import render_to_string
+
 
 
 class VendorRegistrationView(View):
@@ -26,12 +32,26 @@ class VendorRegistrationView(View):
                 user.username = user.email
             user.vendor_status = 'pending'
             user.application_date = timezone.now()
-            user.is_vendor = False  # <<-- Add this line!
+            user.is_vendor = False
 
             random_password = get_random_string(12)
             user.set_password(random_password)
-
             user.save()
+
+            # --- Email Sending Logic ---
+            email_subject = 'Vendor Application Submitted'
+            email_body = render_to_string('accounts/vendor_application_email.html', {
+                'user': user,
+            })
+            send_mail(
+                email_subject,
+                email_body,
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                fail_silently=False,
+            )
+            # ---------------------------
+
             messages.success(request, 'Your vendor application has been submitted successfully! It is now pending approval.')
             return redirect('accounts:vendor_register')
         else:
@@ -80,3 +100,4 @@ def user_logout(request):
     logout(request)
     messages.info(request, "You have been logged out.")
     return redirect('accounts:login')
+

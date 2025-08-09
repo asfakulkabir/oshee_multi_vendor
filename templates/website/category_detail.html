@@ -287,6 +287,25 @@
                     </div>
                     {% endif %}
 
+                    {% if available_filters.sizes %}
+                    <div class="filter-section">
+                        <h6 class="text-sm font-medium uppercase text-gray-500 px-2 mb-2">Sizes</h6>
+                        <div class="px-2 space-y-1">
+                            {% for size in available_filters.sizes %}
+                            <div class="flex items-center">
+                                <input type="checkbox" id="size-{{ forloop.counter }}"
+                                       name="size" value="{{ size }}"
+                                       class="h-4 w-4 text-rose-900 rounded border-gray-300 focus:ring-rose-800"
+                                       {% if size in selected_sizes %}checked{% endif %}>
+                                <label for="size-{{ forloop.counter }}" class="ml-2 text-sm text-gray-700 capitalize">
+                                    {{ size }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
                     {% if available_filters.weights %}
                     <div class="filter-section">
                         <h6 class="text-sm font-medium uppercase text-gray-500 px-2 mb-2">Weights</h6>
@@ -378,7 +397,7 @@
                                 class="aspect-square w-full bg-gray-200 object-cover object-center group-hover:opacity-75 lg:aspect-auto lg:h-80" />
                             {% endif %}
                         </a>
-                        <button class="absolute bottom-2 right-2 p-2 rounded-full text-gray-400 hover:text-red-500 transition-colors duration-200 wishlist-toggle" data-product-id="{{ product.id }}">
+                        <button class="absolute bottom-2 right-2 p-2 rounded-full text-gray-400 hover:text-red-500 transition-colors duration-200 wishlist-toggle" data-product-id="{{ product.prefixed_id }}">
                           <svg class="w-5 h-5 md:w-6 md:h-6 wishlist-icon transition-all duration-200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                           </svg>

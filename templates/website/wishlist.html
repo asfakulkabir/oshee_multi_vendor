@@ -6,7 +6,7 @@
 <div class="container mx-auto p-4 md:py-8">
     <h1 class="text-3xl font-bold mb-6 text-gray-800 pb-3">My Wishlist</h1>
 
-    <div id="wishlistLoading" class="hidden text-center py-10">
+    <div id="wishlistLoading" class="text-center py-10">
         <svg class="animate-spin h-8 w-8 text-rose-800 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -14,8 +14,8 @@
         <p class="text-gray-600 mt-2">Loading wishlist...</p>
     </div>
 
-    <div id="wishlistProductsGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        </div>
+    <div id="wishlistProductsGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 hidden">
+    </div>
 
     <div id="emptyWishlistMessage" class="hidden col-span-full text-center py-12">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -47,28 +47,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const wishlistLoading = document.getElementById('wishlistLoading');
 
     function getWishlist() {
-        const wishlist = localStorage.getItem('wishlist');
-        return wishlist ? JSON.parse(wishlist) : [];
+        try {
+            const wishlist = localStorage.getItem('wishlist');
+            return wishlist ? JSON.parse(wishlist) : [];
+        } catch (e) {
+            console.error("Failed to parse wishlist from localStorage", e);
+            return [];
+        }
     }
 
     function saveWishlist(wishlist) {
         localStorage.setItem('wishlist', JSON.stringify(wishlist));
         document.cookie = `wishlist_ids=${JSON.stringify(wishlist)}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
-    }
-
-    function updateWishlistIcon(productId, isAdded) {
-        document.querySelectorAll(`.wishlist-toggle[data-product-id="${productId}"]`).forEach(button => {
-            const icon = button.querySelector('.wishlist-icon');
-            if (icon) {
-                if (isAdded) {
-                    icon.classList.add('filled');
-                    icon.setAttribute('fill', 'currentColor');
-                } else {
-                    icon.classList.remove('filled');
-                    icon.setAttribute('fill', 'none');
-                }
-            }
-        });
     }
 
     function handleWishlistToggle(event) {
@@ -82,11 +72,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (index > -1) {
             wishlist.splice(index, 1);
-            updateWishlistIcon(productId, false);
             saveWishlist(wishlist);
-            button.closest('.bg-white.rounded-lg').remove();
-            if (getWishlist().length === 0) {
-                emptyWishlistMessage.classList.remove('hidden');
+
+            const productCard = button.closest('.product-card');
+            if (productCard) {
+                // Use a fade-out animation before removing
+                productCard.style.opacity = '0';
+                productCard.style.transition = 'opacity 0.5s ease-out';
+
+                setTimeout(() => {
+                    productCard.remove();
+                    if (getWishlist().length === 0) {
+                        wishlistProductsGrid.classList.add('hidden');
+                        emptyWishlistMessage.classList.remove('hidden');
+                    }
+                }, 500); // Wait for the animation to finish
             }
         }
     }
@@ -94,18 +94,20 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderWishlistProducts(products) {
         wishlistProductsGrid.innerHTML = '';
         if (products.length === 0) {
+            wishlistProductsGrid.classList.add('hidden');
             emptyWishlistMessage.classList.remove('hidden');
         } else {
+            wishlistProductsGrid.classList.remove('hidden');
             emptyWishlistMessage.classList.add('hidden');
             products.forEach(product => {
-                const productCard = `
-                    <div class="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 relative">
+                const productCardHtml = `
+                    <div class="product-card bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 relative">
                         <a href="/product/${product.slug}/" class="block">
                             <img src="${product.image}" alt="${product.name}"
                                 class="aspect-square w-full bg-gray-200 object-cover object-top" />
                         </a>
-                        <button class="absolute bottom-2 right-2 p-1 rounded-full bg-white bg-opacity-75 hover:bg-opacity-100 text-gray-400 hover:text-red-500 transition-colors duration-200 wishlist-toggle" data-product-id="${product.id}">
-                              <svg class="w-6 h-6 wishlist-icon filled" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"  stroke="currentColor" fill="currentColor">
+                        <button class="absolute top-2 right-2 p-1 rounded-full bg-white bg-opacity-75 hover:bg-opacity-100 text-rose-500 hover:text-red-600 transition-colors duration-200 wishlist-toggle" data-product-id="${product.id}">
+                              <svg class="w-6 h-6 wishlist-icon filled" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" fill="currentColor">
     <path d="M12.001 4.529c2.349-2.532 6.15-2.532 8.498 0 2.172 2.343 2.216 6.122.102 8.507l-7.507 7.934a1.125 1.125 0 01-1.628 0l-7.507-7.934C1.284 10.65 1.328 6.872 3.5 4.529c2.348-2.532 6.149-2.532 8.501 0z"/>
   </svg>
                         </button>
@@ -126,24 +128,28 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
                 `;
-                wishlistProductsGrid.insertAdjacentHTML('beforeend', productCard);
+                wishlistProductsGrid.insertAdjacentHTML('beforeend', productCardHtml);
             });
             attachWishlistToggleListeners();
         }
     }
 
     function attachWishlistToggleListeners() {
-        document.querySelectorAll('#wishlistProductsGrid .wishlist-toggle').forEach(button => {
-            button.removeEventListener('click', handleWishlistToggle);
-            button.addEventListener('click', handleWishlistToggle);
+        // This is the core fix: remove existing listeners before adding new ones
+        const wishlistButtons = document.querySelectorAll('#wishlistProductsGrid .wishlist-toggle');
+        wishlistButtons.forEach(button => {
+            // Check if the listener has been attached before to prevent double-firing
+            if (button.dataset.listenerAttached !== 'true') {
+                button.addEventListener('click', handleWishlistToggle);
+                button.dataset.listenerAttached = 'true';
+            }
         });
     }
 
     async function fetchAndDisplayWishlistProducts() {
         const wishlistIds = getWishlist();
         wishlistLoading.classList.remove('hidden');
-        wishlistProductsGrid.innerHTML = '';
-        emptyWishlistMessage.classList.add('hidden');
+        wishlistProductsGrid.classList.add('hidden');
 
         if (wishlistIds.length === 0) {
             wishlistLoading.classList.add('hidden');
@@ -172,7 +178,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Error fetching wishlist products:', error);
             wishlistProductsGrid.innerHTML = `<p class="col-span-full text-center text-red-600 py-10">Error loading wishlist: ${error.message}. Please try again.</p>`;
-            emptyWishlistMessage.classList.add('hidden');
+            wishlistProductsGrid.classList.remove('hidden');
         } finally {
             wishlistLoading.classList.add('hidden');
         }

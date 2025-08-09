@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from products.models import DeliveryCharge
+from django.conf import settings
+from decimal import Decimal
 
 # -----------------------------
 # Main Checkout Model
@@ -52,6 +54,43 @@ class VendorOrder(models.Model):
     customer_name = models.CharField(max_length=255, blank=True, null=True)
     customer_phone = models.CharField(max_length=20, blank=True, null=True)
     customer_address = models.TextField(blank=True, null=True)
+    delivery_charge = models.CharField(max_length=255, blank=True, null=True)    
 
     def __str__(self):
         return f"Vendor Order for {self.vendor.username} from Checkout {self.ecommerce_checkout.id}"
+    
+
+
+# financial summary 
+class VendorFinancialSummary(models.Model):
+    vendor = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name='financial_summaries'
+    )
+    total_revenue = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    total_vendor_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    total_admin_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+
+    def __str__(self):
+        return f"Financial Summary for {self.vendor.username}"
+
+class VendorFinancialTransaction(models.Model):
+    summary = models.ForeignKey(
+        'VendorFinancialSummary',
+        on_delete=models.CASCADE,
+        related_name='transactions'
+    )
+    vendor = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name='financial_transactions'
+    )
+    order = models.ForeignKey('VendorOrder', on_delete=models.CASCADE, related_name='financial_transaction')
+    transaction_date = models.DateTimeField(auto_now_add=True)
+    order_price = models.DecimalField(max_digits=10, decimal_places=2)
+    admin_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    vendor_amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"Transaction for Order #{self.order.id} by {self.vendor.username}"

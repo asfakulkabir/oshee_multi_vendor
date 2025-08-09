@@ -1,6 +1,7 @@
 {% extends "_base/_base.html" %}
 {% load static %}
 
+{% block title %}{{ product.name }}{% endblock %}
 {% block content %}
 <div class="container mx-auto max-w-5xl py-12 px-4">
     <div class="bg-white shadow-xl rounded-lg p-8">
@@ -52,10 +53,6 @@
                         <p class="text-sm font-medium text-gray-500">Description</p>
                         <div class="mt-1 prose prose-sm max-w-none text-gray-900">{{ product.description|safe }}</div>
                     </div>
-                    <div>
-                        <p class="text-sm font-medium text-gray-500">SKU</p>
-                        <p class="mt-1 text-lg font-semibold text-gray-900">{{ product.sku }}</p>
-                    </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <p class="text-sm font-medium text-gray-500">Regular Price</p>
@@ -72,10 +69,14 @@
                         <p class="mt-1 text-lg font-semibold text-gray-900">৳{{ product.vendor_price|default:"N/A" }}</p>
                     </div>
                     <div>
+                        <p class="text-sm font-medium text-gray-500">Commission (%)</p>
+                        <p class="mt-1 text-lg font-semibold text-gray-900">{{ product.admin_commission|floatformat:0|default:"N/A" }}%</p>
+                    </div>
+                    <div>
                         <p class="text-sm font-medium text-gray-500">Stock Quantity</p>
                         <p class="mt-1 text-lg font-semibold text-gray-900">{{ product.stock_quantity|default:"N/A" }}</p>
                     </div>
-                    </div>
+
                     <div>
                         <p class="text-sm font-medium text-gray-500">Categories</p>
                         <div class="mt-1 flex flex-wrap gap-2">
@@ -86,6 +87,9 @@
                             {% endfor %}
                         </div>
                     </div>
+
+                    </div>
+
                 </div>
             </div>
         </div>

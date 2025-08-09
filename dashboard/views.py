@@ -13,10 +13,13 @@ import os
 import re 
 from decimal import Decimal
 from .forms import VendorProductForm, VendorProductImageForm, VariationFormSet, VendorOrderStatusForm  # New: import forms
-from orders.models import VendorOrder  # New: import models for orders
-
-
-
+from orders.models import *  # New: import models for orders
+from decimal import Decimal, ROUND_HALF_UP
+from collections import Counter
+from django.utils import timezone
+from datetime import datetime
+import csv
+from django.http import HttpResponse
 
 @login_required
 def vendor_dashboard(request):
@@ -63,6 +66,21 @@ def vendor_dashboard(request):
     return render(request, 'dashboard/vendor_dashboard.html', context)
 
 
+def get_number_or_default(value_str, default=None, is_int=False):
+    """Safely converts a string to a number (int or Decimal) or returns a default value."""
+    if value_str:
+        try:
+            if is_int:
+                return int(value_str)
+            else:
+                # Use Decimal for monetary values to avoid floating-point issues
+                return Decimal(value_str)
+        except (ValueError, TypeError):
+            # Fallback to default if conversion fails
+            return default
+    return default
+
+
 @login_required
 def vendor_add_product(request):
     categories = Category.objects.all()
@@ -71,34 +89,33 @@ def vendor_add_product(request):
         try:
             with transaction.atomic():
                 name = request.POST.get('name')
-                description = request.POST.get('description')
                 short_description = request.POST.get('short_description')
+                description = request.POST.get('description')
                 product_type = request.POST.get('product_type')
                 
-                regular_price_str = request.POST.get('regular_price')
-                sale_price_str = request.POST.get('sale_price')
-                vendor_price_str = request.POST.get('vendor_price')
-                stock_quantity_str = request.POST.get('stock_quantity')
+                # Use the helper function to safely get and convert values
+                regular_price = get_number_or_default(request.POST.get('regular_price'), default=Decimal('0.00'))
+                sale_price = get_number_or_default(request.POST.get('sale_price'))
+                vendor_price = get_number_or_default(request.POST.get('vendor_price'), default=Decimal('0.00'))
+                
+                # Fix: Explicitly provide a default value to prevent NOT NULL errors
+                admin_commission = get_number_or_default(request.POST.get('admin_commission'), default=Decimal('0.00'))
+                
+                stock_quantity = get_number_or_default(request.POST.get('stock_quantity'), default=0, is_int=True)
 
                 if not name:
                     messages.error(request, "Product name is required.")
                     return render(request, 'dashboard/vendor_add_product.html', {'categories': categories})
 
-                try:
-                    regular_price = Decimal(regular_price_str) if regular_price_str else None
-                    sale_price = Decimal(sale_price_str) if sale_price_str else None
-                    vendor_price = Decimal(vendor_price_str) if vendor_price_str else None
-                    stock_quantity = int(stock_quantity_str) if stock_quantity_str else 0
-
-                    for price in [regular_price, sale_price, vendor_price]:
-                        if price is not None and price < 0:
-                            messages.error(request, "Prices cannot be negative.")
-                            return render(request, 'dashboard/vendor_add_product.html', {'categories': categories})
-                    if stock_quantity < 0:
-                        messages.error(request, "Stock quantity cannot be negative.")
-                        return render(request, 'dashboard/vendor_add_product.html', {'categories': categories})
-                except (ValueError, TypeError):
-                    messages.error(request, "Please enter valid numbers for price and stock.")
+                # You can use a form or more robust validation here, but for this example, we'll keep the direct checks.
+                if regular_price is not None and regular_price < 0:
+                    messages.error(request, "Regular price cannot be negative.")
+                    return render(request, 'dashboard/vendor_add_product.html', {'categories': categories})
+                if sale_price is not None and sale_price >= regular_price:
+                    messages.error(request, "Sale price must be less than the regular price.")
+                    return render(request, 'dashboard/vendor_add_product.html', {'categories': categories})
+                if stock_quantity < 0:
+                    messages.error(request, "Stock quantity cannot be negative.")
                     return render(request, 'dashboard/vendor_add_product.html', {'categories': categories})
 
                 vendor_product = VendorProduct.objects.create(
@@ -110,6 +127,7 @@ def vendor_add_product(request):
                     regular_price=regular_price,
                     sale_price=sale_price,
                     vendor_price=vendor_price,
+                    admin_commission=admin_commission,
                     stock_quantity=stock_quantity,
                     is_active=request.POST.get('is_active') == 'on',
                     is_featured=request.POST.get('is_featured') == 'on',
@@ -141,20 +159,17 @@ def vendor_add_product(request):
                     stock_str = request.POST.get(f'variation_stock_{i}')
 
                     if size or color or weight:
-                        try:
-                            variation_price = Decimal(price_str) if price_str else None
-                            variation_stock = int(stock_str) if stock_str else 0
-                            
-                            VendorProductVariation.objects.create(
-                                product=vendor_product,
-                                size=size,
-                                color=color,
-                                weight=weight,
-                                price=variation_price,
-                                stock=variation_stock
-                            )
-                        except (ValueError, TypeError):
-                            messages.warning(request, f"Skipped variation {i+1} due to invalid number format.")
+                        variation_price = get_number_or_default(price_str)
+                        variation_stock = get_number_or_default(stock_str, default=0, is_int=True)
+                        
+                        VendorProductVariation.objects.create(
+                            product=vendor_product,
+                            size=size,
+                            color=color,
+                            weight=weight,
+                            price=variation_price,
+                            stock=variation_stock
+                        )
 
             messages.success(request, f"Product '{vendor_product.name}' has been successfully added and is awaiting approval.")
             return redirect('dashboard:vendor_dashboard')
@@ -169,25 +184,10 @@ def vendor_add_product(request):
     }
     return render(request, 'dashboard/vendor_add_product.html', context)
 
-def get_number_or_default(value_str, default=None, is_int=False):
-    if value_str:
-        try:
-            if is_int:
-                return int(value_str)
-            else:
-                return Decimal(value_str)
-        except (ValueError, TypeError):
-            return default
-    return default
-
 @login_required
 def vendor_edit_product(request, product_id):
     product = get_object_or_404(VendorProduct, id=product_id, vendor=request.user)
     categories = Category.objects.all()
-
-    if product.status == VendorProduct.STATUS_APPROVED:
-        messages.warning(request, "You cannot edit an approved product.")
-        return redirect('dashboard:vendor_product', pk=product.pk)
 
     if request.method == 'POST':
         try:
@@ -200,10 +200,14 @@ def vendor_edit_product(request, product_id):
                 product.seo_title = request.POST.get('seo_title')
                 product.meta_description = request.POST.get('meta_description')
 
-                product.regular_price = get_number_or_default(request.POST.get('regular_price'), is_int=False)
-                product.sale_price = get_number_or_default(request.POST.get('sale_price'), is_int=False)
-                product.vendor_price = get_number_or_default(request.POST.get('vendor_price'), is_int=False)
-                product.stock_quantity = get_number_or_default(request.POST.get('stock_quantity'), default=0, is_int=True)
+                product.regular_price = get_number_or_default(request.POST.get('regular_price'), default=Decimal('0.00'), is_int=False)
+                product.sale_price = get_number_or_default(request.POST.get('sale_price'), default=None, is_int=False)
+                product.vendor_price = get_number_or_default(request.POST.get('vendor_price'), default=Decimal('0.00'), is_int=False)
+                
+                # --- FIX: Provide an explicit default value for admin_commission ---
+                product.admin_commission = get_number_or_default(request.POST.get('admin_commission'), default=Decimal('0.00'), is_int=False)
+                
+                product.stock_quantity = get_number_or_default(request.POST.get('stock_quantity'), default=1, is_int=True)
                 
                 product.status = VendorProduct.STATUS_PENDING
                 product.save()
@@ -258,7 +262,7 @@ def vendor_edit_product(request, product_id):
                             variation_obj.size = request.POST.get(f'existing_variation_size_{index}', '')
                             variation_obj.color = request.POST.get(f'existing_variation_color_{index}', '')
                             variation_obj.weight = request.POST.get(f'existing_variation_weight_{index}', '')
-                            variation_obj.price = get_number_or_default(request.POST.get(f'existing_variation_price_{index}'), is_int=False)
+                            variation_obj.price = get_number_or_default(request.POST.get(f'existing_variation_price_{index}'), default=Decimal('0.00'), is_int=False)
                             variation_obj.stock = get_number_or_default(request.POST.get(f'existing_variation_stock_{index}'), default=0, is_int=True)
                             variation_obj.save()
                 
@@ -267,11 +271,9 @@ def vendor_edit_product(request, product_id):
                 VendorProductVariation.objects.filter(id__in=variations_to_delete).delete()
 
                 # --- CORRECTED LOGIC FOR NEW VARIATIONS ---
-                # Find all unique indices for new variations, regardless of which fields are filled
                 new_variation_indices = set()
                 for key in request.POST:
                     if key.startswith('new_variation_'):
-                        # Extract the numeric index from the key (e.g., 'new_variation_size_1' -> '1')
                         index_str = key.split('_')[-1]
                         if index_str.isdigit():
                             new_variation_indices.add(int(index_str))
@@ -283,14 +285,13 @@ def vendor_edit_product(request, product_id):
                     price = request.POST.get(f'new_variation_price_{i}', '')
                     stock = request.POST.get(f'new_variation_stock_{i}', '')
                     
-                    # Only create a new variation if at least one field has been filled
                     if size or color or weight or price or stock:
                         VendorProductVariation.objects.create(
                             product=product,
                             size=size,
                             color=color,
                             weight=weight,
-                            price=get_number_or_default(price, is_int=False),
+                            price=get_number_or_default(price, default=Decimal('0.00'), is_int=False),
                             stock=get_number_or_default(stock, default=0, is_int=True)
                         )
                 # --- END OF CORRECTED LOGIC ---
@@ -313,8 +314,6 @@ def vendor_edit_product(request, product_id):
         'product_types': VendorProduct.PRODUCT_TYPE_CHOICES,
     }
     return render(request, 'dashboard/vendor_edit_product.html', context)
-
-
 @login_required
 def delete_product_application(request, pk):
     """
@@ -383,7 +382,7 @@ def vendor_profile_view(request):
     # Check if the user is a vendor (you may have a field like is_vendor or vendor_status)
     if not getattr(profile, 'is_vendor', False) and profile.vendor_status != 'approved':
         messages.error(request, "You do not have vendor access or your vendor application is not approved.")
-        return redirect('some_other_page')  # Change to your preferred URL
+        return redirect('dashboard:vendor_dashboard')
 
     context = {
         'profile': profile,
@@ -394,6 +393,9 @@ def vendor_profile_view(request):
 @login_required
 def vendor_my_orders(request):
     vendor_orders_list = VendorOrder.objects.filter(vendor=request.user).order_by('-created_at')
+    vendor_products_qs = VendorProduct.objects.filter(vendor=request.user)
+    vendor_products = {str(v.id): v for v in vendor_products_qs}
+    status_counts = Counter(vendor_orders_list.values_list('status', flat=True))
 
     # Define status choices statically
     STATUS_CHOICES = [
@@ -428,12 +430,43 @@ def vendor_my_orders(request):
     except EmptyPage:
         page_obj = paginator.get_page(paginator.num_pages)
 
+    # --- Financial Calculation Logic ---
     for order in page_obj:
         items_list = order.items_json
+        vendor_amount = Decimal('0.00')
+
+        # Calculate item subtotal and vendor amount for each item
         for item in items_list:
-            item['subtotal'] = item.get('quantity', 0) * item.get('price', 0)
+            item_price = Decimal(str(item.get('price', 0)))
+            item_quantity = int(item.get('quantity', 0))
+            item_product_id = item.get('product_id')
+            
+            item['subtotal'] = item_price * item_quantity
+            
+            # Use a try-except block in case vendor_products is missing the item
+            try:
+                vendor_product = vendor_products[str(item_product_id)]
+                vendor_price = Decimal(str(vendor_product.vendor_price))
+                vendor_amount += vendor_price * item_quantity
+            except (KeyError, TypeError):
+                # Handle cases where the product ID or vendor price is not found
+                # For safety, we can just skip or log this issue.
+                pass
+        
+        # Calculate the admin amount for the order
+        try:
+            total_price = Decimal(str(order.total_price))
+        except (ValueError, TypeError):
+            total_price = Decimal('0.00')
+
+        admin_amount = total_price - vendor_amount
+
+
+        # Attach the calculated values to the order object for use in the template
         order.items_json = items_list
-    
+        order.vendor_amount = vendor_amount
+        order.admin_amount = admin_amount
+
     if request.method == 'POST':
         order_id = request.POST.get('order_id')
         order = get_object_or_404(VendorOrder, id=order_id, vendor=request.user)
@@ -454,7 +487,111 @@ def vendor_my_orders(request):
         'forms_dict': forms_dict,
         'search_query': search_query,
         'status_filter': status_filter,
-        'status_choices': STATUS_CHOICES, # Using the static choices here
+        'status_choices': STATUS_CHOICES,
+        'vendor_products': vendor_products,
+        'status_counts': {
+            'processing': status_counts.get('processing', 0),
+            'shipped': status_counts.get('shipped', 0),
+            'delivered': status_counts.get('delivered', 0),
+            'canceled': status_counts.get('canceled', 0),
+        }
     }
     
     return render(request, 'dashboard/vendor_my_orders.html', context)
+
+
+
+@login_required
+def vendor_financial_summary_view(request):
+    """
+    View for displaying vendor's financial summary and transaction history
+    with pagination and comprehensive financial data.
+    """
+    try:
+        # 1. Get or create financial summary for the vendor
+        vendor_summary, created = VendorFinancialSummary.objects.get_or_create(
+            vendor=request.user
+        )
+        
+        # 2. Get transactions with related order data for performance
+        transactions = VendorFinancialTransaction.objects.filter(
+            vendor=request.user
+        ).select_related('order').order_by('-transaction_date')
+        
+        # 3. Set up pagination
+        paginator = Paginator(transactions, 10)  # Show 10 transactions per page
+        page_number = request.GET.get('page')
+        
+        try:
+            page_obj = paginator.page(page_number)
+        except PageNotAnInteger:
+            page_obj = paginator.page(1)
+        except EmptyPage:
+            page_obj = paginator.page(paginator.num_pages)
+        
+        # 4. Prepare context data
+        context = {
+            'summary': {
+                'total_revenue': vendor_summary.total_revenue or 0,
+                'total_vendor_amount': vendor_summary.total_vendor_amount or 0,
+                'total_admin_amount': vendor_summary.total_admin_amount or 0,
+                'total_orders': transactions.count(),
+                'last_transaction_date': transactions.first().transaction_date if transactions.exists() else None,
+            },
+            'transactions': page_obj,
+            'current_date': timezone.now().date(),
+            'page_obj': page_obj,  # For pagination controls
+        }
+        
+        return render(request, 'dashboard/vendor_financial_summary.html', context)
+    
+    except Exception as e:
+        # Log the error (in production, you'd use proper logging)
+        print(f"Error in vendor_financial_summary_view: {str(e)}")
+        
+        # Return a simplified error context
+        return render(request, 'dashboard/vendor_financial_summary.html', {
+            'error': 'Unable to load financial data. Please try again later.'
+        })
+
+
+
+@login_required
+def vendor_download_transactions_view(request):
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+
+    if not start_date_str or not end_date_str:
+        messages.error(request, "Please provide both start and end dates.")
+        return redirect('dashboard:vendor_dashboard')  # Change this to your dashboard or form page URL
+
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        messages.error(request, "Invalid date format.")
+        return redirect('dashboard:vendor_dashboard')
+
+    transactions = VendorFinancialTransaction.objects.filter(
+        vendor=request.user,
+        transaction_date__date__range=(start_date, end_date)
+    ).select_related('order').order_by('transaction_date')
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = (
+        f'attachment; filename="transactions_{start_date_str}_to_{end_date_str}.csv"'
+    )
+
+    writer = csv.writer(response)
+    writer.writerow(['Order ID', 'Transaction Date', 'Order Price (৳)', 'My Amount (৳)', 'Admin Amount (৳)'])
+
+    for transaction in transactions:
+        writer.writerow([
+            transaction.order.id,
+            transaction.transaction_date.strftime('%Y-%m-%d %H:%M:%S'),
+            f'{transaction.order_price:.2f}',
+            f'{transaction.vendor_amount:.2f}',
+            f'{transaction.admin_amount:.2f}',
+        ])
+
+    return response

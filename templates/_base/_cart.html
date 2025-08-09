@@ -1,4 +1,4 @@
-<div id="sidebar-container">
+<div id="sidebar-container" class="overflow-y-auto">
     <!-- Toggle Button -->
     <button id="toggle-sidebar" class="fixed bottom-8 right-4 z-20 rounded-full bg-green-600 p-4 text-white focus-visible:outline-green-700 cursor-pointer">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5" class="size-6">
@@ -19,7 +19,7 @@
         </div>
 
         <!-- Cart Items -->
-        <div id="cart-items" class="flex flex-col gap-2 overflow-y-auto py-4">
+        <div id="cart-items"  class="flex flex-col gap-2 overflow-y-auto py-4 max-h-[calc(100vh-200px)]">
             <!-- Cart items will be dynamically inserted here -->
         </div>
 
@@ -120,7 +120,7 @@ cartItemsContainer.addEventListener("click", function (event) {
                             </button>
                         </div>
                     </div>
-                    <p class="text-sm font-bold text-gray-900">৳${itemTotal.toFixed(2)}</p>
+                    <p class="text-xs font-bold text-rose-700">৳${itemTotal.toFixed(2)}</p>
                 </div>
             `;
 
